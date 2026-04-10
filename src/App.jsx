@@ -26,6 +26,7 @@ export default function App() {
         telegram_id: telegramUser.id,
         first_name: telegramUser.first_name || "",
         last_name: telegramUser.last_name || "",
+        full_name: `${telegramUser.first_name || ""} ${telegramUser.last_name || ""}`.trim(),
         username: telegramUser.username || "",
         photo_url: telegramUser.photo_url || "",
       };

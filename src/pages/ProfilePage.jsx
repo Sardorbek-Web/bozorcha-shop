@@ -6,15 +6,27 @@ import { useUserStore } from "../store/useUserStore";
 export default function ProfilePage() {
   const { telegramUser, profile } = useUserStore();
 
+  const displayName =
+    profile?.full_name?.trim() ||
+    `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() ||
+    `${telegramUser?.first_name || ""} ${telegramUser?.last_name || ""}`.trim() ||
+    "Foydalanuvchi";
+
+  const displayUsername =
+    profile?.username || telegramUser?.username || "";
+
+  const displayPhoto =
+    profile?.photo_url || telegramUser?.photo_url || "";
+
   return (
     <MobileLayout title="Profil">
       <div className="space-y-4 pb-24">
         <div className="card card-dark p-4">
           <div className="flex items-center gap-4">
-            {telegramUser?.photo_url ? (
+            {displayPhoto ? (
               <img
-                src={telegramUser.photo_url}
-                alt={telegramUser.first_name}
+                src={displayPhoto}
+                alt={displayName}
                 className="h-16 w-16 rounded-2xl object-cover"
               />
             ) : (
@@ -24,9 +36,7 @@ export default function ProfilePage() {
             )}
 
             <div>
-              <p className="text-lg font-bold">
-                {profile?.first_name || telegramUser?.first_name || "Foydalanuvchi"}
-              </p>
+              <p className="text-lg font-bold">{displayName}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 Telegram orqali kirgan
               </p>
@@ -37,15 +47,13 @@ export default function ProfilePage() {
         <div className="card card-dark space-y-3 p-4">
           <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
             <User size={16} className="text-violet-600" />
-            <span className="text-sm">
-              Ism: {profile?.first_name || "-"} {profile?.last_name || ""}
-            </span>
+            <span className="text-sm">Ism: {displayName}</span>
           </div>
 
           <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
             <AtSign size={16} className="text-violet-600" />
             <span className="text-sm">
-              Username: {profile?.username ? `@${profile.username}` : "Mavjud emas"}
+              Username: {displayUsername ? `@${displayUsername}` : "Mavjud emas"}
             </span>
           </div>
 

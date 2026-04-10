@@ -12,11 +12,8 @@ export default function ProfilePage() {
     `${telegramUser?.first_name || ""} ${telegramUser?.last_name || ""}`.trim() ||
     "Foydalanuvchi";
 
-  const displayUsername =
-    profile?.username || telegramUser?.username || "";
-
-  const displayPhoto =
-    profile?.photo_url || telegramUser?.photo_url || "";
+  const displayUsername = profile?.username || telegramUser?.username || "";
+  const displayPhoto = profile?.photo_url || telegramUser?.photo_url || "";
 
   return (
     <MobileLayout title="Profil">

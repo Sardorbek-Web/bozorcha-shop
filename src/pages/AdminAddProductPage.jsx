@@ -42,8 +42,8 @@ export default function AdminAddProductPage() {
       .select("*")
       .order("created_at", { ascending: true });
 
-    if (!error && data) {
-      setCategories(data);
+    if (!error) {
+      setCategories(data || []);
     }
   }
 
@@ -64,7 +64,7 @@ export default function AdminAddProductPage() {
 
       if (image) {
         const fileExt = image.name.split(".").pop();
-        const fileName = `${Date.now()}.${fileExt}`;
+        const fileName = `product-${Date.now()}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
           .from("product-images")
@@ -94,6 +94,7 @@ export default function AdminAddProductPage() {
             supply_type: form.supplyType,
             delivery_days_min: Number(form.deliveryDaysMin || 10),
             delivery_days_max: Number(form.deliveryDaysMax || 12),
+            is_active: true,
           },
         ])
         .select()
@@ -168,224 +169,134 @@ export default function AdminAddProductPage() {
           <h2 className="text-lg font-bold">Yangi mahsulot</h2>
 
           <div className="mt-4 space-y-4">
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Package size={16} />
-                Mahsulot nomi (UZ)
-              </label>
-              <input
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                className="input"
-                placeholder="Masalan: Erkaklar krossovkasi"
-                required
-              />
-            </div>
+            <input
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              className="input"
+              placeholder="Mahsulot nomi (UZ)"
+              required
+            />
 
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Package size={16} />
-                Mahsulot nomi (RU)
-              </label>
-              <input
-                name="nameRu"
-                value={form.nameRu}
-                onChange={handleChange}
-                className="input"
-                placeholder="Например: Мужские кроссовки"
-              />
-            </div>
+            <input
+              name="nameRu"
+              value={form.nameRu}
+              onChange={handleChange}
+              className="input"
+              placeholder="Mahsulot nomi (RU)"
+            />
 
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Layers3 size={16} />
-                Kategoriya
-              </label>
-              <select
-                name="category"
-                value={form.category}
-                onChange={handleChange}
-                className="input"
-                required
-              >
-                <option value="">Kategoriyani tanlang</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name_uz}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              name="category"
+              value={form.category}
+              onChange={handleChange}
+              className="input"
+              required
+            >
+              <option value="">Kategoriya tanlang</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name_uz}
+                </option>
+              ))}
+            </select>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <Tag size={16} />
-                  Narx
-                </label>
-                <input
-                  name="price"
-                  type="number"
-                  value={form.price}
-                  onChange={handleChange}
-                  className="input"
-                  placeholder="199000"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <Tag size={16} />
-                  Eski narx
-                </label>
-                <input
-                  name="oldPrice"
-                  type="number"
-                  value={form.oldPrice}
-                  onChange={handleChange}
-                  className="input"
-                  placeholder="259000"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Boxes size={16} />
-                Ombordagi soni
-              </label>
               <input
-                name="stock"
+                name="price"
                 type="number"
-                value={form.stock}
+                value={form.price}
                 onChange={handleChange}
                 className="input"
-                placeholder="10"
+                placeholder="Narx"
                 required
               />
-            </div>
-
-            <div className="rounded-3xl bg-violet-50 p-4 dark:bg-violet-500/10">
-              <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-violet-700 dark:text-violet-300">
-                <Truck size={16} />
-                Yetkazib berish ma'lumoti
-              </label>
-
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="mb-2 block text-sm font-medium">
-                    Turi
-                  </label>
-                  <select
-                    name="supplyType"
-                    value={form.supplyType}
-                    onChange={handleChange}
-                    className="input"
-                  >
-                    <option value="preorder">Xitoydan buyurtma</option>
-                    <option value="ready">Tayyor mahsulot</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">
-                      Min kun
-                    </label>
-                    <input
-                      name="deliveryDaysMin"
-                      type="number"
-                      value={form.deliveryDaysMin}
-                      onChange={handleChange}
-                      className="input"
-                      placeholder="10"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">
-                      Max kun
-                    </label>
-                    <input
-                      name="deliveryDaysMax"
-                      type="number"
-                      value={form.deliveryDaysMax}
-                      onChange={handleChange}
-                      className="input"
-                      placeholder="12"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Cargo narxi saytga chiqmaydi. Keyinchalik mijozga alohida aytiladi.
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <FileText size={16} />
-                Tavsif (UZ)
-              </label>
-              <textarea
-                name="description"
-                value={form.description}
-                onChange={handleChange}
-                className="input min-h-[120px] resize-none"
-                placeholder="Mahsulot haqida to'liq yozing"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <FileText size={16} />
-                Tavsif (RU)
-              </label>
-              <textarea
-                name="descriptionRu"
-                value={form.descriptionRu}
-                onChange={handleChange}
-                className="input min-h-[120px] resize-none"
-                placeholder="Описание товара"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 text-sm font-medium">O'lchamlar</label>
               <input
-                name="sizes"
-                value={form.sizes}
+                name="oldPrice"
+                type="number"
+                value={form.oldPrice}
                 onChange={handleChange}
                 className="input"
-                placeholder="M, L, XL, XXL yoki 40,41,42,43"
+                placeholder="Eski narx"
               />
             </div>
 
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <ImagePlus size={16} />
-                Rasm yuklash
-              </label>
+            <input
+              name="stock"
+              type="number"
+              value={form.stock}
+              onChange={handleChange}
+              className="input"
+              placeholder="Ombordagi soni"
+              required
+            />
 
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-violet-400 dark:border-neutral-700">
-                <ImagePlus size={24} className="mb-2 text-violet-600" />
-                <span className="font-medium">
-                  {image ? image.name : "Mahsulot rasmini tanlang"}
-                </span>
-                <span className="mt-1 text-sm text-gray-500">
-                  PNG yoki JPG
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => setImage(e.target.files?.[0] || null)}
-                />
-              </label>
+            <select
+              name="supplyType"
+              value={form.supplyType}
+              onChange={handleChange}
+              className="input"
+            >
+              <option value="preorder">Xitoydan buyurtma</option>
+              <option value="ready">Tayyor mahsulot</option>
+            </select>
+
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                name="deliveryDaysMin"
+                type="number"
+                value={form.deliveryDaysMin}
+                onChange={handleChange}
+                className="input"
+                placeholder="Min kun"
+              />
+              <input
+                name="deliveryDaysMax"
+                type="number"
+                value={form.deliveryDaysMax}
+                onChange={handleChange}
+                className="input"
+                placeholder="Max kun"
+              />
             </div>
+
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              className="input min-h-[120px] resize-none"
+              placeholder="Tavsif (UZ)"
+            />
+
+            <textarea
+              name="descriptionRu"
+              value={form.descriptionRu}
+              onChange={handleChange}
+              className="input min-h-[120px] resize-none"
+              placeholder="Tavsif (RU)"
+            />
+
+            <input
+              name="sizes"
+              value={form.sizes}
+              onChange={handleChange}
+              className="input"
+              placeholder="M, L, XL, XXL yoki 40,41,42"
+            />
+
+            <label className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-violet-400 dark:border-neutral-700">
+              <ImagePlus size={24} className="mb-2 text-violet-600" />
+              <span className="font-medium">
+                {image ? image.name : "Mahsulot rasmini tanlang"}
+              </span>
+              <span className="mt-1 text-sm text-gray-500">PNG yoki JPG</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setImage(e.target.files?.[0] || null)}
+              />
+            </label>
 
             {message && (
               <div className="rounded-2xl bg-gray-100 p-3 text-sm dark:bg-neutral-800">

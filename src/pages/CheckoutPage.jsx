@@ -36,7 +36,8 @@ export default function CheckoutPage() {
     if (profile) {
       setPhone(profile.phone || "+998");
       setFullName(
-        `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
+        profile.full_name ||
+          `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
       );
     }
   }, [profile]);
@@ -63,19 +64,8 @@ export default function CheckoutPage() {
 
   const handlePhoneChange = (e) => {
     let value = e.target.value.replace(/[^\d+]/g, "");
-
-    if (!value.startsWith("+998")) {
-      value = "+998";
-    }
-
+    if (!value.startsWith("+998")) value = "+998";
     setPhone(value);
-  };
-
-  const handleReceiptChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setReceipt(file);
-    }
   };
 
   function handleDetectLocation() {
@@ -98,34 +88,13 @@ export default function CheckoutPage() {
   async function handleSubmit() {
     setMessage("");
 
-    if (!fullName.trim()) {
-      setMessage("Ism kiriting");
-      return;
-    }
-
-    if (!phone.trim() || phone.length < 13) {
-      setMessage("Telefon noto‘g‘ri");
-      return;
-    }
-
-    if (!address.trim()) {
-      setMessage("Manzil kiriting");
-      return;
-    }
-
-    if (!receipt) {
-      setMessage("Chek yuklang");
-      return;
-    }
-
-    if (!orderData.productId) {
-      setMessage("Mahsulot topilmadi");
-      return;
-    }
-
+    if (!fullName.trim()) return setMessage("Ism kiriting");
+    if (!phone.trim() || phone.length < 13) return setMessage("Telefon noto‘g‘ri");
+    if (!address.trim()) return setMessage("Manzil kiriting");
+    if (!receipt) return setMessage("Chek yuklang");
+    if (!orderData.productId) return setMessage("Mahsulot topilmadi");
     if (orderData.productId === "cart" && items.length === 0) {
-      setMessage("Savatcha bo‘sh");
-      return;
+      return setMessage("Savatcha bo‘sh");
     }
 
     setSubmitting(true);
@@ -138,9 +107,7 @@ export default function CheckoutPage() {
         .from("payment-receipts")
         .upload(fileName, receipt);
 
-      if (uploadError) {
-        throw uploadError;
-      }
+      if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
         .from("payment-receipts")
@@ -161,14 +128,12 @@ export default function CheckoutPage() {
         .select()
         .single();
 
-      if (addressError) {
-        throw addressError;
-      }
+      if (addressError) throw addressError;
 
       if (profile?.telegram_id) {
         await supabase
           .from("profiles")
-          .update({ phone })
+          .update({ phone, full_name: fullName })
           .eq("telegram_id", profile.telegram_id);
       }
 
@@ -177,7 +142,6 @@ export default function CheckoutPage() {
 
       if (orderData.productId === "cart") {
         orderTotal = getTotal();
-
         orderItems = items.map((item) => ({
           product_id: item.id,
           variant_value: item.selectedSize || null,
@@ -186,7 +150,6 @@ export default function CheckoutPage() {
         }));
       } else {
         orderTotal = Number(orderData.productPrice || 0);
-
         orderItems = [
           {
             product_id: orderData.productId,
@@ -197,7 +160,7 @@ export default function CheckoutPage() {
         ];
       }
 
-      const { data: orderDataInsert, error: orderError } = await supabase
+      const { data: orderInsert, error: orderError } = await supabase
         .from("orders")
         .insert([
           {
@@ -205,6 +168,7 @@ export default function CheckoutPage() {
             total_amount: orderTotal,
             status: "new",
             payment_status: "pending_review",
+            payment_method: "card_transfer",
             receipt_url: receiptUrl,
             notes:
               orderData.productId === "cart"
@@ -215,25 +179,21 @@ export default function CheckoutPage() {
         .select()
         .single();
 
-      if (orderError) {
-        throw orderError;
-      }
+      if (orderError) throw orderError;
 
       const itemsToInsert = orderItems.map((item) => ({
-        order_id: orderDataInsert.id,
+        order_id: orderInsert.id,
         product_id: item.product_id,
         variant_value: item.variant_value,
         quantity: item.quantity,
         price: item.price,
       }));
 
-      const { error: orderItemsError } = await supabase
+      const { error: itemsError } = await supabase
         .from("order_items")
         .insert(itemsToInsert);
 
-      if (orderItemsError) {
-        throw orderItemsError;
-      }
+      if (itemsError) throw itemsError;
 
       await fetch("http://localhost:5000/send-order", {
         method: "POST",
@@ -261,22 +221,18 @@ export default function CheckoutPage() {
       }
 
       setMessage("Buyurtma yuborildi ✅");
-      setFullName("");
-      setPhone("+998");
-      setAddress("");
       setReceipt(null);
-    } catch (err) {
-      console.error(err);
-      setMessage("Xatolik yuz berdi");
+      setAddress("");
+    } catch (error) {
+      console.error(error);
+      setMessage(`Xatolik: ${error.message}`);
     } finally {
       setSubmitting(false);
     }
   }
 
   const isCartOrder = orderData.productId === "cart";
-  const totalPrice = isCartOrder
-    ? getTotal()
-    : Number(orderData.productPrice || 0);
+  const totalPrice = isCartOrder ? getTotal() : Number(orderData.productPrice || 0);
 
   return (
     <MobileLayout title="Buyurtma berish">
@@ -286,20 +242,17 @@ export default function CheckoutPage() {
 
           {isCartOrder ? (
             <div className="mt-4 space-y-3">
-              {items.length === 0 && (
-                <p className="text-sm text-gray-500">Savatcha bo‘sh</p>
-              )}
-
               {items.map((item) => (
                 <div
-                  key={item.id}
+                  key={`${item.id}-${item.selectedSize || ""}`}
                   className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70"
                 >
                   <p className="font-semibold">{item.name}</p>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Soni: {item.quantity}
-                  </p>
-                  <p className="mt-1 text-sm text-violet-600 font-bold">
+                  {item.selectedSize && (
+                    <p className="mt-1 text-sm text-gray-500">O'lcham: {item.selectedSize}</p>
+                  )}
+                  <p className="mt-1 text-sm text-gray-500">Soni: {item.quantity}</p>
+                  <p className="mt-1 text-sm font-bold text-violet-600">
                     {(item.price * item.quantity).toLocaleString()} so'm
                   </p>
                 </div>
@@ -310,165 +263,85 @@ export default function CheckoutPage() {
               <p className="font-semibold">
                 {orderData.productName || "Mahsulot tanlanmagan"}
               </p>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-2 text-sm text-gray-500">
                 O'lcham: {orderData.selectedSize || "Tanlanmagan"}
               </p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-sm text-gray-500">
                 Narx: {totalPrice.toLocaleString()} so'm
               </p>
             </div>
           )}
         </div>
 
-        <div className="card card-dark p-4">
-          <h2 className="text-lg font-bold">Mijoz ma'lumotlari</h2>
+        <div className="card card-dark p-4 space-y-3">
+          <input
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="input"
+            placeholder="Ism familiya"
+          />
 
-          <div className="mt-4 space-y-3">
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <User size={16} />
-                Ism familiya
-              </label>
-              <input
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="input"
-                placeholder="Ismingizni kiriting"
-              />
-            </div>
+          <input
+            value={phone}
+            onChange={handlePhoneChange}
+            className="input"
+            placeholder="+998"
+          />
 
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Phone size={16} />
-                Telefon raqam
-              </label>
-              <input
-                value={phone}
-                onChange={handlePhoneChange}
-                className="input"
-                placeholder="+998"
-              />
-            </div>
+          <textarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            className="input min-h-[100px] resize-none"
+            placeholder="Manzil"
+          />
 
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <MapPin size={16} />
-                Manzil
-              </label>
-              <textarea
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="input min-h-[100px] resize-none"
-                placeholder="To'liq manzilni kiriting"
-              />
-            </div>
-
-            <button onClick={handleDetectLocation} className="btn-secondary w-full">
-              Joylashuvni aniqlash
-            </button>
-          </div>
+          <button onClick={handleDetectLocation} className="btn-secondary w-full">
+            Joylashuvni aniqlash
+          </button>
         </div>
 
         <div className="card card-dark p-4">
-          <h2 className="text-lg font-bold">Yetkazib berish haqida</h2>
-
-          <div className="mt-4 grid gap-2">
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <Clock3 size={18} className="text-violet-600" />
-              <span className="text-sm">
-                Yetkazib berish: {orderData.deliveryText || "10-12 kun"}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <Truck size={18} className="text-violet-600" />
-              <span className="text-sm">
-                Cargo summasi keyinchalik Telegram yoki telefon orqali aytiladi
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="card card-dark p-4">
-          <h2 className="text-lg font-bold">To'lov ma'lumotlari</h2>
-
-          <div className="mt-4 rounded-3xl bg-violet-600 p-4 text-white">
-            <div className="flex items-center gap-2">
-              <CreditCard size={18} />
-              <span className="font-semibold">Karta orqali to'lov</span>
-            </div>
-
+          <div className="mt-2 rounded-3xl bg-violet-600 p-4 text-white">
             {loadingSettings ? (
-              <div className="mt-4 flex items-center gap-2 text-sm text-violet-100">
+              <div className="flex items-center gap-2 text-sm">
                 <Loader2 size={16} className="animate-spin" />
                 Yuklanmoqda...
               </div>
             ) : (
               <>
-                <p className="mt-4 text-sm text-violet-100">Karta raqami</p>
+                <p className="text-sm text-violet-100">Karta raqami</p>
                 <p className="mt-1 text-xl font-bold tracking-wider">
                   {settings?.card_number || "Karta topilmadi"}
                 </p>
-
                 <p className="mt-3 text-sm text-violet-100">Karta egasi</p>
                 <p className="font-semibold">
                   {settings?.card_holder_name || "Noma'lum"}
-                </p>
-
-                <p className="mt-3 text-sm text-violet-100">Aloqa uchun</p>
-                <p className="font-semibold">
-                  {settings?.phone_primary || "+998"}
                 </p>
               </>
             )}
           </div>
 
-          <div className="mt-4">
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <Upload size={16} />
-              To'lov chekini yuklang
-            </label>
-
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-violet-400 dark:border-neutral-700">
-              <Upload size={22} className="mb-2 text-violet-600" />
-              <span className="font-medium">
-                {receipt ? receipt.name : "Chek rasmini tanlang"}
-              </span>
-              <span className="mt-1 text-sm text-gray-500">
-                JPG, PNG yoki PDF
-              </span>
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={handleReceiptChange}
-                className="hidden"
-              />
-            </label>
-          </div>
+          <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-gray-300 p-6 text-center">
+            <Upload size={22} className="mb-2 text-violet-600" />
+            <span className="font-medium">
+              {receipt ? receipt.name : "Chek rasmini tanlang"}
+            </span>
+            <span className="mt-1 text-sm text-gray-500">JPG, PNG yoki PDF</span>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(e) => setReceipt(e.target.files?.[0] || null)}
+              className="hidden"
+            />
+          </label>
         </div>
 
         <div className="card card-dark p-4">
-          <h2 className="text-lg font-bold">Buyurtma xulosasi</h2>
-
-          <div className="mt-4 space-y-3">
-            <div className="flex justify-between text-sm">
-              <span>Mahsulot</span>
-              <span>{totalPrice.toLocaleString()} so'm</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Yetkazib berish</span>
-              <span>{orderData.deliveryText || "10-12 kun"}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Cargo</span>
-              <span>Keyin bildiriladi</span>
-            </div>
-            <div className="flex justify-between border-t pt-3 text-base font-bold">
-              <span>Jami</span>
-              <span className="text-violet-600">
-                {totalPrice.toLocaleString()} so'm
-              </span>
-            </div>
+          <div className="flex justify-between text-sm">
+            <span>Jami</span>
+            <span className="font-bold text-violet-600">
+              {totalPrice.toLocaleString()} so'm
+            </span>
           </div>
 
           {message && (

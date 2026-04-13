@@ -145,7 +145,6 @@ export default function AdminEditProductPage() {
                 value={form.name}
                 onChange={handleChange}
                 className="input"
-                placeholder="Masalan: Erkaklar krossovkasi"
                 required
               />
             </div>
@@ -160,7 +159,6 @@ export default function AdminEditProductPage() {
                 value={form.nameRu}
                 onChange={handleChange}
                 className="input"
-                placeholder="Например: Мужские кроссовки"
               />
             </div>
 

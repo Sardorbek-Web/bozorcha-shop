@@ -13,6 +13,8 @@ import { Link } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,7 @@ export default function AdminOrdersPage() {
       const chatId = data.addresses?.telegram_chat_id;
 
       if (chatId) {
-        await fetch("http://localhost:5000/send-status", {
+        await fetch(`${API_URL}/send-status`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -106,7 +108,7 @@ export default function AdminOrdersPage() {
           const address = order.addresses;
 
           return (
-            <div key={order.id} className="card card-dark p-4 space-y-3">
+            <div key={order.id} className="card card-dark space-y-3 p-4">
               <div className="flex items-center justify-between">
                 <p className="font-bold">#{order.id.slice(0, 6)}</p>
 

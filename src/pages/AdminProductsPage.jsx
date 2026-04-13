@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Trash2, Pencil, Plus, Package } from "lucide-react";
+import { Trash2, Pencil, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
@@ -30,7 +30,7 @@ export default function AdminProductsPage() {
   }
 
   async function deleteProduct(id) {
-    const confirmDelete = confirm("Rostdan o‘chirmoqchimisiz?");
+    const confirmDelete = window.confirm("Rostdan o‘chirmoqchimisiz?");
     if (!confirmDelete) return;
 
     const { error } = await supabase
@@ -48,28 +48,24 @@ export default function AdminProductsPage() {
   return (
     <MobileLayout title="Mahsulotlar">
       <div className="space-y-4 pb-24">
-        {/* ADD BUTTON */}
         <Link
           to="/admin/products/new"
-          className="flex items-center justify-center gap-2 rounded-2xl bg-violet-600 py-3 text-white font-semibold"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-violet-600 py-3 font-semibold text-white"
         >
           <Plus size={18} />
           Yangi mahsulot qo‘shish
         </Link>
 
-        {/* LOADING */}
         {loading && (
           <div className="card card-dark p-6">Yuklanmoqda...</div>
         )}
 
-        {/* EMPTY */}
         {!loading && products.length === 0 && (
           <div className="card card-dark p-6 text-center text-sm text-gray-500">
             Mahsulotlar yo‘q
           </div>
         )}
 
-        {/* LIST */}
         {!loading &&
           products.map((product) => (
             <div key={product.id} className="card card-dark p-4">
@@ -79,7 +75,6 @@ export default function AdminProductsPage() {
                   <p className="text-sm text-gray-500">
                     {Number(product.price).toLocaleString()} so'm
                   </p>
-
                   <p className="mt-1 text-xs text-gray-400">
                     {product.supply_type === "preorder"
                       ? "Xitoydan buyurtma"
@@ -88,18 +83,18 @@ export default function AdminProductsPage() {
                 </div>
 
                 <div className="flex gap-2">
-                  {/* EDIT */}
                   <Link
                     to={`/admin/products/edit/${product.id}`}
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-neutral-800"
+                    title="Tahrirlash"
                   >
                     <Pencil size={16} />
                   </Link>
 
-                  {/* DELETE */}
                   <button
                     onClick={() => deleteProduct(product.id)}
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500 text-white"
+                    title="O‘chirish"
                   >
                     <Trash2 size={16} />
                   </button>

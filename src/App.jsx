@@ -31,54 +31,50 @@ export default function App() {
         photo_url: telegramUser.photo_url || "",
       };
 
-      try {
-        const { data: existingProfile, error: findError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("telegram_id", telegramUser.id)
-          .maybeSingle();
+      const { data: existingProfile, error: findError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("telegram_id", telegramUser.id)
+        .maybeSingle();
 
-        if (findError) {
-          console.error("Profile qidirishda xatolik:", findError);
+      if (findError) {
+        console.error("Profile qidirishda xatolik:", findError);
+        return;
+      }
+
+      if (existingProfile) {
+        const { data: updatedProfile, error: updateError } = await supabase
+          .from("profiles")
+          .update(payload)
+          .eq("telegram_id", telegramUser.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error("Profile yangilashda xatolik:", updateError);
           return;
         }
 
-        if (existingProfile) {
-          const { data: updatedProfile, error: updateError } = await supabase
-            .from("profiles")
-            .update(payload)
-            .eq("telegram_id", telegramUser.id)
-            .select()
-            .single();
+        setProfile(updatedProfile);
+      } else {
+        const { data: newProfile, error: insertError } = await supabase
+          .from("profiles")
+          .insert([
+            {
+              ...payload,
+              role: "customer",
+              language: "uz",
+            },
+          ])
+          .select()
+          .single();
 
-          if (updateError) {
-            console.error("Profile yangilashda xatolik:", updateError);
-            return;
-          }
-
-          setProfile(updatedProfile);
-        } else {
-          const { data: newProfile, error: insertError } = await supabase
-            .from("profiles")
-            .insert([
-              {
-                ...payload,
-                role: "customer",
-                language: "uz",
-              },
-            ])
-            .select()
-            .single();
-
-          if (insertError) {
-            console.error("Profile qo'shishda xatolik:", insertError);
-            return;
-          }
-
-          setProfile(newProfile);
+        if (insertError) {
+          console.error("Profile qo'shishda xatolik:", insertError);
+          return;
         }
-      } catch (error) {
-        console.error("Telegram setup xatolik:", error);
+
+        setProfile(newProfile);
       }
     }
 

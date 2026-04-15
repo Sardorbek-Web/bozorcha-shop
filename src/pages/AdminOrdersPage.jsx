@@ -4,8 +4,6 @@ import { Link } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +25,8 @@ export default function AdminOrdersPage() {
           full_name,
           phone,
           address_line,
-          telegram_chat_id
+          telegram_chat_id,
+          map_url
         ),
         order_items (
           product_id,
@@ -100,7 +99,7 @@ export default function AdminOrdersPage() {
 
       if (updateError) throw updateError;
 
-      const response = await fetch(`${API_URL}/send-status`, {
+      const response = await fetch("/api/send-status", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -119,7 +118,11 @@ export default function AdminOrdersPage() {
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || "Telegramga yuborilmadi");
+        throw new Error(
+          typeof result.error === "string"
+            ? result.error
+            : "Telegramga yuborilmadi"
+        );
       }
 
       alert("Mijozga yuborildi ✅");
@@ -178,6 +181,18 @@ export default function AdminOrdersPage() {
                   <MapPin size={14} />
                   <span>{address?.address_line || "-"}</span>
                 </div>
+
+                {address?.map_url ? (
+                  <a
+                    href={address.map_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 text-violet-600"
+                  >
+                    <MapPin size={14} />
+                    Xaritada ko‘rish
+                  </a>
+                ) : null}
               </div>
 
               <div className="flex justify-between text-sm">

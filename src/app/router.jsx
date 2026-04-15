@@ -17,6 +17,7 @@ import AdminEditProductPage from "../pages/AdminEditProductPage";
 import AdminOrdersPage from "../pages/AdminOrdersPage";
 import AdminOrderDetailPage from "../pages/AdminOrderDetailPage";
 import AdminSettingsPage from "../pages/AdminSettingsPage";
+import SupportPage from "../pages/SupportPage";
 
 import AdminRoute from "../components/auth/AdminRoute";
 
@@ -28,6 +29,7 @@ export function AppRouter() {
       <Route path="/product/:id" element={<ProductPage />} />
       <Route path="/cart" element={<CartPage />} />
       <Route path="/checkout" element={<CheckoutPage />} />
+      <Route path="/profile/support" element={<SupportPage />} />
       <Route path="/favorites" element={<FavoritesPage />} />
       <Route path="/orders" element={<OrdersPage />} />
       <Route path="/orders/:id" element={<OrderDetailPage />} />

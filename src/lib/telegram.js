@@ -7,11 +7,16 @@ export function initTelegramApp() {
       isDark: false,
       user: null,
       startParam: null,
+      tg: null,
     };
   }
 
-  tg.ready();
-  tg.expand();
+  try {
+    tg.ready();
+    tg.expand();
+  } catch (error) {
+    console.error("Telegram init xato:", error);
+  }
 
   const colorScheme = tg.colorScheme || "light";
   const user = tg.initDataUnsafe?.user || null;

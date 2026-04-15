@@ -9,72 +9,76 @@ export default function App() {
 
   useEffect(() => {
     async function setupTelegram() {
-      const tgData = initTelegramApp();
+      try {
+        const tgData = initTelegramApp();
 
-      if (tgData?.isDark) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
+        if (tgData?.isDark) {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
 
-      if (!tgData?.user) return;
+        if (!tgData?.user) return;
 
-      const telegramUser = tgData.user;
-      setTelegramUser(telegramUser);
+        const telegramUser = tgData.user;
+        setTelegramUser(telegramUser);
 
-      const payload = {
-        telegram_id: telegramUser.id,
-        first_name: telegramUser.first_name || "",
-        last_name: telegramUser.last_name || "",
-        full_name: `${telegramUser.first_name || ""} ${telegramUser.last_name || ""}`.trim(),
-        username: telegramUser.username || "",
-        photo_url: telegramUser.photo_url || "",
-      };
+        const payload = {
+          telegram_id: telegramUser.id,
+          first_name: telegramUser.first_name || "",
+          last_name: telegramUser.last_name || "",
+          full_name: `${telegramUser.first_name || ""} ${telegramUser.last_name || ""}`.trim(),
+          username: telegramUser.username || "",
+          photo_url: telegramUser.photo_url || "",
+        };
 
-      const { data: existingProfile, error: findError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("telegram_id", telegramUser.id)
-        .maybeSingle();
-
-      if (findError) {
-        console.error("Profile qidirishda xatolik:", findError);
-        return;
-      }
-
-      if (existingProfile) {
-        const { data: updatedProfile, error: updateError } = await supabase
+        const { data: existingProfile, error: findError } = await supabase
           .from("profiles")
-          .update(payload)
+          .select("*")
           .eq("telegram_id", telegramUser.id)
-          .select()
-          .single();
+          .maybeSingle();
 
-        if (updateError) {
-          console.error("Profile yangilashda xatolik:", updateError);
+        if (findError) {
+          console.error("Profile qidirishda xatolik:", findError);
           return;
         }
 
-        setProfile(updatedProfile);
-      } else {
-        const { data: newProfile, error: insertError } = await supabase
-          .from("profiles")
-          .insert([
-            {
-              ...payload,
-              role: "customer",
-              language: "uz",
-            },
-          ])
-          .select()
-          .single();
+        if (existingProfile) {
+          const { data: updatedProfile, error: updateError } = await supabase
+            .from("profiles")
+            .update(payload)
+            .eq("telegram_id", telegramUser.id)
+            .select()
+            .single();
 
-        if (insertError) {
-          console.error("Profile qo'shishda xatolik:", insertError);
-          return;
+          if (updateError) {
+            console.error("Profile yangilashda xatolik:", updateError);
+            return;
+          }
+
+          setProfile(updatedProfile);
+        } else {
+          const { data: newProfile, error: insertError } = await supabase
+            .from("profiles")
+            .insert([
+              {
+                ...payload,
+                role: "customer",
+                language: "uz",
+              },
+            ])
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error("Profile qo'shishda xatolik:", insertError);
+            return;
+          }
+
+          setProfile(newProfile);
         }
-
-        setProfile(newProfile);
+      } catch (error) {
+        console.error("App setup xatolik:", error);
       }
     }
 

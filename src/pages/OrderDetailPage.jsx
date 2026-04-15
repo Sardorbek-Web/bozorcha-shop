@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import {
   Package,
-  Phone,
-  MapPin,
-  Receipt,
-  CalendarDays,
-  Ruler,
-  Hash,
   Clock3,
-  BadgeCheck,
   Truck,
+  CircleX,
+  CheckCircle2,
+  Receipt,
+  MapPin,
+  Image as ImageIcon,
+  Scale,
+  Wallet,
 } from "lucide-react";
-import { useParams } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
 
@@ -22,17 +22,17 @@ function getStatusLabel(status) {
     case "confirmed":
       return "Tasdiqlangan";
     case "in_cargo":
-      return "Cargo yo'lida";
+      return "Cargo yo'lda";
     case "delivered":
-      return "Yetkazilgan";
+      return "Yetib keldi";
     case "cancelled":
-      return "Bekor qilingan";
+      return "Bekor qilindi";
     default:
-      return status;
+      return "Noma'lum";
   }
 }
 
-function getStatusClass(status) {
+function getStatusStyle(status) {
   switch (status) {
     case "new":
       return "bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-300";
@@ -49,18 +49,33 @@ function getStatusClass(status) {
   }
 }
 
+function getStatusIcon(status) {
+  switch (status) {
+    case "new":
+      return Clock3;
+    case "confirmed":
+      return CheckCircle2;
+    case "in_cargo":
+      return Truck;
+    case "delivered":
+      return Package;
+    case "cancelled":
+      return CircleX;
+    default:
+      return Package;
+  }
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams();
-
   const [order, setOrder] = useState(null);
-  const [productsMap, setProductsMap] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchOrderDetail();
+    fetchOrder();
   }, [id]);
 
-  async function fetchOrderDetail() {
+  async function fetchOrder() {
     setLoading(true);
 
     const { data, error } = await supabase
@@ -70,10 +85,10 @@ export default function OrderDetailPage() {
         addresses (
           full_name,
           phone,
-          address_line
+          address_line,
+          map_url
         ),
         order_items (
-          id,
           product_id,
           variant_value,
           quantity,
@@ -85,28 +100,9 @@ export default function OrderDetailPage() {
 
     if (error) {
       console.error(error);
-      setLoading(false);
-      return;
-    }
-
-    setOrder(data);
-
-    const productIds =
-      data.order_items?.map((item) => item.product_id).filter(Boolean) || [];
-
-    if (productIds.length > 0) {
-      const { data: productRows, error: productsError } = await supabase
-        .from("products")
-        .select("id, name_uz")
-        .in("id", productIds);
-
-      if (!productsError && productRows) {
-        const map = {};
-        productRows.forEach((product) => {
-          map[product.id] = product;
-        });
-        setProductsMap(map);
-      }
+      setOrder(null);
+    } else {
+      setOrder(data);
     }
 
     setLoading(false);
@@ -128,147 +124,157 @@ export default function OrderDetailPage() {
     );
   }
 
-  const address = order.addresses;
+  const StatusIcon = getStatusIcon(order.status);
 
   return (
-    <MobileLayout title="Buyurtma batafsil">
+    <MobileLayout title="Buyurtma tafsiloti">
       <div className="space-y-4 pb-24">
         <div className="card card-dark p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-lg font-bold">#{order.id.slice(0, 8)}</p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {new Date(order.created_at).toLocaleString()}
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Buyurtma raqami
               </p>
+              <p className="mt-1 text-lg font-bold">#{order.id.slice(0, 8)}</p>
             </div>
 
             <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(
                 order.status
               )}`}
             >
+              <StatusIcon size={14} />
               {getStatusLabel(order.status)}
             </span>
           </div>
-        </div>
 
-        <div className="card card-dark p-4">
-          <h2 className="text-lg font-bold">Mijoz ma'lumotlari</h2>
-
-          <div className="mt-4 grid gap-3">
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <Package size={16} className="text-violet-600" />
-              <span className="text-sm">
-                Ism: {address?.full_name || "Noma'lum"}
-              </span>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
+              <p className="text-sm text-gray-500 dark:text-gray-400">Jami</p>
+              <p className="mt-1 font-bold text-violet-600">
+                {Number(order.total_amount || 0).toLocaleString()} so'm
+              </p>
             </div>
 
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <Phone size={16} className="text-violet-600" />
-              <span className="text-sm">
-                Telefon: {address?.phone || "-"}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <MapPin size={16} className="text-violet-600" />
-              <span className="text-sm">
-                Manzil: {address?.address_line || "-"}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <CalendarDays size={16} className="text-violet-600" />
-              <span className="text-sm">
-                Sana: {new Date(order.created_at).toLocaleString()}
-              </span>
+            <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
+              <p className="text-sm text-gray-500 dark:text-gray-400">To'lov</p>
+              <p className="mt-1 font-bold">
+                {order.payment_status || "pending_review"}
+              </p>
             </div>
           </div>
         </div>
 
         <div className="card card-dark p-4">
-          <h2 className="text-lg font-bold">Holat</h2>
+          <h2 className="text-lg font-bold">Mijoz ma'lumoti</h2>
 
-          <div className="mt-4 grid gap-2">
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              {order.status === "delivered" ? (
-                <BadgeCheck size={16} className="text-violet-600" />
-              ) : order.status === "in_cargo" ? (
-                <Truck size={16} className="text-violet-600" />
-              ) : (
-                <Clock3 size={16} className="text-violet-600" />
-              )}
-              <span className="text-sm">{getStatusLabel(order.status)}</span>
+          <div className="mt-4 space-y-3 text-sm">
+            <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
+              <p className="text-gray-500 dark:text-gray-400">Ism</p>
+              <p className="mt-1 font-semibold">{order.addresses?.full_name || "-"}</p>
             </div>
 
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <Receipt size={16} className="text-violet-600" />
-              <span className="text-sm">
-                To'lov: {order.payment_status}
-              </span>
+            <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
+              <p className="text-gray-500 dark:text-gray-400">Telefon</p>
+              <p className="mt-1 font-semibold">{order.addresses?.phone || "-"}</p>
             </div>
 
-            {order.receipt_url && (
+            <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
+              <p className="text-gray-500 dark:text-gray-400">Manzil</p>
+              <p className="mt-1 font-semibold">
+                {order.addresses?.address_line || "-"}
+              </p>
+            </div>
+
+            {order.addresses?.map_url ? (
               <a
-                href={order.receipt_url}
+                href={order.addresses.map_url}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-2xl bg-violet-600 px-4 py-3 text-center text-sm font-semibold text-white"
+                className="flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 font-semibold text-white"
               >
-                Chekni ochish
+                <MapPin size={16} />
+                Xaritada ko'rish
               </a>
-            )}
+            ) : null}
           </div>
         </div>
 
         <div className="card card-dark p-4">
-          <h2 className="text-lg font-bold">Mahsulotlar</h2>
+          <h2 className="text-lg font-bold">Buyurtma tarkibi</h2>
 
           <div className="mt-4 space-y-3">
-            {order.order_items?.length === 0 && (
-              <div className="text-sm text-gray-500">
-                Mahsulot topilmadi
-              </div>
-            )}
-
-            {order.order_items?.map((item) => (
+            {(order.order_items || []).map((item, index) => (
               <div
-                key={item.id}
+                key={index}
                 className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70"
               >
-                <p className="font-semibold">
-                  {productsMap[item.product_id]?.name_uz || "Mahsulot"}
-                </p>
+                <div className="flex items-center gap-2">
+                  <Receipt size={15} className="text-violet-600" />
+                  <p className="font-semibold">Mahsulot #{index + 1}</p>
+                </div>
 
-                <div className="mt-2 grid gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <div className="flex items-center gap-2">
-                    <Hash size={14} className="text-violet-600" />
-                    <span>Soni: {item.quantity}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Ruler size={14} className="text-violet-600" />
-                    <span>O'lcham: {item.variant_value || "Tanlanmagan"}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Receipt size={14} className="text-violet-600" />
-                    <span>Narx: {Number(item.price).toLocaleString()} so'm</span>
-                  </div>
+                <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                  <p>Soni: {item.quantity}</p>
+                  <p>Narx: {Number(item.price || 0).toLocaleString()} so'm</p>
+                  <p>O'lcham: {item.variant_value || "Tanlanmagan"}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="card card-dark p-4">
-          <div className="flex items-center justify-between text-base font-bold">
-            <span>Jami summa</span>
-            <span className="text-violet-600">
-              {Number(order.total_amount).toLocaleString()} so'm
-            </span>
+        {order.status === "in_cargo" &&
+        (order.cargo_weight_kg || order.cargo_amount) ? (
+          <div className="card card-dark p-4">
+            <h2 className="text-lg font-bold">Cargo ma'lumoti</h2>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <Scale size={14} />
+                  <span className="text-sm">Og'irligi</span>
+                </div>
+                <p className="mt-1 font-bold">
+                  {order.cargo_weight_kg || "-"} kg
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <Wallet size={14} />
+                  <span className="text-sm">Narxi</span>
+                </div>
+                <p className="mt-1 font-bold">
+                  {order.cargo_amount
+                    ? `${Number(order.cargo_amount).toLocaleString()} so'm`
+                    : "-"}
+                </p>
+              </div>
+            </div>
+
+            {order.admin_note ? (
+              <div className="mt-3 rounded-2xl bg-gray-50 p-3 text-sm dark:bg-neutral-800/70">
+                <p className="text-gray-500 dark:text-gray-400">Izoh</p>
+                <p className="mt-1 font-medium">{order.admin_note}</p>
+              </div>
+            ) : null}
           </div>
-        </div>
+        ) : null}
+
+        {order.receipt_url ? (
+          <div className="card card-dark p-4">
+            <a
+              href={order.receipt_url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-gray-100 px-4 py-3 font-semibold dark:bg-neutral-800"
+            >
+              <ImageIcon size={16} />
+              To'lov chekini ko'rish
+            </a>
+          </div>
+        ) : null}
       </div>
     </MobileLayout>
   );

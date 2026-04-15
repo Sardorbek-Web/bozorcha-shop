@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
-import {
-  Clock3,
-  Package,
-  Phone,
-  MapPin,
-  BadgeCheck,
-  Truck,
-  Eye,
-} from "lucide-react";
 import { Link } from "react-router-dom";
+import {
+  Package,
+  Clock3,
+  Truck,
+  CircleX,
+  CheckCircle2,
+  ChevronRight,
+  Receipt,
+  MapPin,
+} from "lucide-react";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
+import { useUserStore } from "../store/useUserStore";
 
 function getStatusLabel(status) {
   switch (status) {
@@ -19,17 +21,17 @@ function getStatusLabel(status) {
     case "confirmed":
       return "Tasdiqlangan";
     case "in_cargo":
-      return "Cargo yo'lida";
+      return "Cargo yo'lda";
     case "delivered":
-      return "Yetkazilgan";
+      return "Yetib keldi";
     case "cancelled":
-      return "Bekor qilingan";
+      return "Bekor qilindi";
     default:
-      return status;
+      return "Noma'lum";
   }
 }
 
-function getStatusClass(status) {
+function getStatusStyle(status) {
   switch (status) {
     case "new":
       return "bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-300";
@@ -46,16 +48,57 @@ function getStatusClass(status) {
   }
 }
 
+function getStatusIcon(status) {
+  switch (status) {
+    case "new":
+      return Clock3;
+    case "confirmed":
+      return CheckCircle2;
+    case "in_cargo":
+      return Truck;
+    case "delivered":
+      return Package;
+    case "cancelled":
+      return CircleX;
+    default:
+      return Package;
+  }
+}
+
 export default function OrdersPage() {
+  const { profile } = useUserStore();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (profile?.telegram_id) {
+      fetchOrders();
+    } else {
+      setLoading(false);
+    }
+  }, [profile?.telegram_id]);
 
   async function fetchOrders() {
     setLoading(true);
+
+    const { data: addressRows, error: addressError } = await supabase
+      .from("addresses")
+      .select("id")
+      .eq("telegram_chat_id", String(profile.telegram_id));
+
+    if (addressError) {
+      console.error(addressError);
+      setLoading(false);
+      return;
+    }
+
+    const addressIds = (addressRows || []).map((a) => a.id);
+
+    if (addressIds.length === 0) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from("orders")
@@ -64,21 +107,24 @@ export default function OrdersPage() {
         addresses (
           full_name,
           phone,
-          address_line
+          address_line,
+          map_url
         ),
         order_items (
-          id,
+          product_id,
           variant_value,
           quantity,
           price
         )
       `)
+      .in("address_id", addressIds)
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      setOrders(data);
-    } else {
+    if (error) {
       console.error(error);
+      setOrders([]);
+    } else {
+      setOrders(data || []);
     }
 
     setLoading(false);
@@ -87,95 +133,83 @@ export default function OrdersPage() {
   return (
     <MobileLayout title="Buyurtmalarim">
       <div className="space-y-4 pb-24">
-        {loading && <div className="card card-dark p-6">Yuklanmoqda...</div>}
-
-        {!loading && orders.length === 0 && (
-          <div className="card card-dark p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            Hozircha buyurtmalar yo‘q
+        {loading ? (
+          <div className="card card-dark p-6">Yuklanmoqda...</div>
+        ) : orders.length === 0 ? (
+          <div className="card card-dark p-6 text-center">
+            <p className="text-base font-semibold">Hozircha buyurtmalar yo‘q</p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Mahsulot tanlab buyurtma bering, buyurtmalaringiz shu yerda chiqadi.
+            </p>
           </div>
-        )}
-
-        {!loading &&
+        ) : (
           orders.map((order) => {
-            const address = order.addresses;
-            const firstItem = order.order_items?.[0];
+            const StatusIcon = getStatusIcon(order.status);
 
             return (
-              <div key={order.id} className="card card-dark p-4">
+              <Link
+                key={order.id}
+                to={`/orders/${order.id}`}
+                className="card card-dark block p-4"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-base font-bold">
-                      Buyurtma #{order.id.slice(0, 6)}
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Buyurtma raqami
                     </p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {new Date(order.created_at).toLocaleString()}
+                    <p className="mt-1 text-base font-bold">
+                      #{order.id.slice(0, 8)}
                     </p>
                   </div>
 
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(
                       order.status
                     )}`}
                   >
+                    <StatusIcon size={14} />
                     {getStatusLabel(order.status)}
                   </span>
                 </div>
 
-                <div className="mt-4 grid gap-2">
-                  <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-                    <Package size={16} className="text-violet-600" />
-                    <div className="text-sm">
-                      <p>Mahsulot summasi: {Number(order.total_amount).toLocaleString()} so'm</p>
-                      {firstItem?.variant_value && (
-                        <p className="text-gray-500 dark:text-gray-400">
-                          O'lcham: {firstItem.variant_value}
-                        </p>
-                      )}
-                    </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
+                    <p className="text-gray-500 dark:text-gray-400">Jami summa</p>
+                    <p className="mt-1 font-bold text-violet-600">
+                      {Number(order.total_amount || 0).toLocaleString()} so'm
+                    </p>
                   </div>
 
-                  {address?.phone && (
-                    <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-                      <Phone size={16} className="text-violet-600" />
-                      <span className="text-sm">{address.phone}</span>
-                    </div>
-                  )}
-
-                  {address?.address_line && (
-                    <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-                      <MapPin size={16} className="text-violet-600" />
-                      <span className="text-sm">{address.address_line}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-                    {order.status === "delivered" ? (
-                      <BadgeCheck size={16} className="text-violet-600" />
-                    ) : order.status === "in_cargo" ? (
-                      <Truck size={16} className="text-violet-600" />
-                    ) : (
-                      <Clock3 size={16} className="text-violet-600" />
-                    )}
-                    <span className="text-sm">
-                      {order.status === "new" && "To'lov tekshirilmoqda"}
-                      {order.status === "confirmed" && "Buyurtma tasdiqlandi"}
-                      {order.status === "in_cargo" && "Mahsulot cargo jarayonida"}
-                      {order.status === "delivered" && "Buyurtma topshirildi"}
-                      {order.status === "cancelled" && "Buyurtma bekor qilingan"}
-                    </span>
+                  <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
+                    <p className="text-gray-500 dark:text-gray-400">Mahsulotlar</p>
+                    <p className="mt-1 font-bold">
+                      {order.order_items?.length || 0} ta
+                    </p>
                   </div>
                 </div>
 
-                <Link
-                  to={`/orders/${order.id}`}
-                  className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-violet-600 py-3 text-sm font-semibold text-white"
-                >
-                  <Eye size={16} />
-                  Batafsil ko‘rish
-                </Link>
-              </div>
+                <div className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                  <div className="flex items-center gap-2">
+                    <Receipt size={14} />
+                    <span>{order.notes || "Buyurtma"}</span>
+                  </div>
+
+                  {order.addresses?.map_url ? (
+                    <div className="flex items-center gap-2">
+                      <MapPin size={14} />
+                      <span>Joylashuv saqlangan</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 flex items-center justify-end gap-1 text-sm font-semibold text-violet-600">
+                  Batafsil
+                  <ChevronRight size={16} />
+                </div>
+              </Link>
             );
-          })}
+          })
+        )}
       </div>
     </MobileLayout>
   );

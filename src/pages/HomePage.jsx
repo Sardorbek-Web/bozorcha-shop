@@ -3,6 +3,19 @@ import MobileLayout from "../components/layout/MobileLayout";
 import ProductCard from "../components/ui/ProductCard";
 import { supabase } from "../lib/supabase";
 
+function resolveImageUrl(imagePathOrUrl) {
+  if (!imagePathOrUrl) return "";
+  if (imagePathOrUrl.startsWith("http://") || imagePathOrUrl.startsWith("https://")) {
+    return imagePathOrUrl;
+  }
+
+  const { data } = supabase.storage
+    .from("product-images")
+    .getPublicUrl(imagePathOrUrl);
+
+  return data?.publicUrl || "";
+}
+
 export default function HomePage() {
   const [products, setProducts] = useState([]);
   const [imagesMap, setImagesMap] = useState({});
@@ -41,7 +54,7 @@ export default function HomePage() {
         const map = {};
         (imagesData || []).forEach((img) => {
           if (img?.product_id && !map[img.product_id]) {
-            map[img.product_id] = img.image_url || "";
+            map[img.product_id] = resolveImageUrl(img.image_url);
           }
         });
         setImagesMap(map);

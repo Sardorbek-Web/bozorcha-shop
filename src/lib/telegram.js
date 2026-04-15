@@ -18,15 +18,11 @@ export function initTelegramApp() {
     console.error("Telegram init xato:", error);
   }
 
-  const colorScheme = tg.colorScheme || "light";
-  const user = tg.initDataUnsafe?.user || null;
-  const startParam = tg.initDataUnsafe?.start_param || null;
-
   return {
     isTelegram: true,
-    isDark: colorScheme === "dark",
-    user,
-    startParam,
+    isDark: (tg.colorScheme || "light") === "dark",
+    user: tg.initDataUnsafe?.user || null,
+    startParam: tg.initDataUnsafe?.start_param || null,
     tg,
   };
 }

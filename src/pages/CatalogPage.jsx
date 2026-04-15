@@ -3,6 +3,19 @@ import MobileLayout from "../components/layout/MobileLayout";
 import ProductCard from "../components/ui/ProductCard";
 import { supabase } from "../lib/supabase";
 
+function resolveImageUrl(imagePathOrUrl) {
+  if (!imagePathOrUrl) return "";
+  if (imagePathOrUrl.startsWith("http://") || imagePathOrUrl.startsWith("https://")) {
+    return imagePathOrUrl;
+  }
+
+  const { data } = supabase.storage
+    .from("product-images")
+    .getPublicUrl(imagePathOrUrl);
+
+  return data?.publicUrl || "";
+}
+
 export default function CatalogPage() {
   const [products, setProducts] = useState([]);
   const [imagesMap, setImagesMap] = useState({});
@@ -42,7 +55,7 @@ export default function CatalogPage() {
         const map = {};
         (imagesData || []).forEach((img) => {
           if (img?.product_id && !map[img.product_id]) {
-            map[img.product_id] = img.image_url || "";
+            map[img.product_id] = resolveImageUrl(img.image_url);
           }
         });
 
@@ -60,11 +73,10 @@ export default function CatalogPage() {
   }
 
   const filteredProducts = useMemo(() => {
+    const query = search.toLowerCase();
     return products.filter((item) => {
       const uz = item?.name_uz || "";
       const ru = item?.name_ru || "";
-      const query = search.toLowerCase();
-
       return uz.toLowerCase().includes(query) || ru.toLowerCase().includes(query);
     });
   }, [products, search]);

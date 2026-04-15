@@ -38,7 +38,7 @@ export default function FavoritesPage() {
                   <Link to={`/product/${item.id}`} className="font-semibold">
                     {item.name || "Mahsulot"}
                   </Link>
-                  <p className="mt-1 text-violet-600 font-bold">
+                  <p className="mt-1 font-bold text-violet-600">
                     {Number(item.price || 0).toLocaleString()} so'm
                   </p>
                 </div>

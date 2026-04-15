@@ -27,7 +27,9 @@ export default function MobileLayout({ title, children }) {
         <div className="grid grid-cols-5 gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = location.pathname === item.to;
+            const active =
+              location.pathname === item.to ||
+              (item.to !== "/" && location.pathname.startsWith(item.to));
 
             return (
               <Link

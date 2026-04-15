@@ -38,7 +38,7 @@ export default function CheckoutPage() {
       setPhone(profile.phone || "+998");
       setFullName(
         profile.full_name ||
-        `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
+          `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
       );
     }
   }, [profile]);
@@ -54,12 +54,13 @@ export default function CheckoutPage() {
       .from("settings")
       .select("*")
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!error && data) {
       setSettings(data);
     } else {
       console.error("settings xato:", error);
+      setSettings(null);
     }
 
     setLoadingSettings(false);
@@ -95,19 +96,26 @@ export default function CheckoutPage() {
         });
 
         setAddress("Xaritadan tanlangan joylashuv");
-        setMessage("Joylashuv xaritada olindi ✅");
+        setMessage("Joylashuv olindi ✅");
       },
       () => setMessage("Joylashuvni olish rad etildi")
     );
+  }
+
+  async function parseApiResponse(response) {
+    const raw = await response.text();
+    try {
+      return JSON.parse(raw);
+    } catch {
+      throw new Error(raw || "Serverdan noto‘g‘ri javob keldi");
+    }
   }
 
   async function handleSubmit() {
     setMessage("");
 
     if (!fullName.trim()) return setMessage("Ism kiriting");
-    if (!phone.trim() || phone.length < 13) {
-      return setMessage("Telefon noto‘g‘ri");
-    }
+    if (!phone.trim() || phone.length < 13) return setMessage("Telefon noto‘g‘ri");
     if (!address.trim()) return setMessage("Manzil kiriting");
     if (!receipt) return setMessage("Chek yuklang");
     if (!orderData.productId) return setMessage("Mahsulot topilmadi");
@@ -153,16 +161,6 @@ export default function CheckoutPage() {
 
       if (addressError) throw addressError;
 
-      if (profile?.telegram_id) {
-        await supabase
-          .from("profiles")
-          .update({
-            phone,
-            full_name: fullName,
-          })
-          .eq("telegram_id", profile.telegram_id);
-      }
-
       let orderTotal = 0;
       let orderItems = [];
       let productNameForBot = "";
@@ -170,20 +168,16 @@ export default function CheckoutPage() {
       let deliveryTextForBot = orderData.deliveryText || "10-12 kun";
 
       if (orderData.productId === "cart") {
-        orderTotal = getTotal();
-
-        orderItems = items.map((item) => ({
+        orderTotal = typeof getTotal === "function" ? getTotal() : 0;
+        orderItems = (items || []).map((item) => ({
           product_id: item.id,
           variant_value: item.selectedSize || null,
           quantity: item.quantity,
           price: item.price,
         }));
-
         productNameForBot = `Savatcha (${items.length} ta mahsulot)`;
-        selectedSizeForBot = "";
       } else {
         orderTotal = Number(orderData.productPrice || 0);
-
         orderItems = [
           {
             product_id: orderData.productId,
@@ -192,7 +186,6 @@ export default function CheckoutPage() {
             price: Number(orderData.productPrice || 0),
           },
         ];
-
         productNameForBot = orderData.productName || "Mahsulot";
         selectedSizeForBot = orderData.selectedSize || "";
       }
@@ -250,20 +243,13 @@ export default function CheckoutPage() {
         }),
       });
 
-      const raw = await response.text();
-      let result = {};
+      const result = await parseApiResponse(response);
 
-      try {
-        result = JSON.parse(raw);
-      } catch {
-        throw new Error(raw || "Serverdan noto'g'ri javob keldi");
-      }
-
-      if (!result.success) {
+      if (!response.ok || !result.success) {
         throw new Error(
           typeof result.error === "string"
             ? result.error
-            : "Botga yuborilmadi"
+            : result.message || "Botga yuborilmadi"
         );
       }
 
@@ -284,7 +270,11 @@ export default function CheckoutPage() {
   }
 
   const isCartOrder = orderData.productId === "cart";
-  const totalPrice = isCartOrder ? getTotal() : Number(orderData.productPrice || 0);
+  const totalPrice = isCartOrder
+    ? typeof getTotal === "function"
+      ? getTotal()
+      : 0
+    : Number(orderData.productPrice || 0);
 
   return (
     <MobileLayout title="Buyurtma berish">
@@ -297,29 +287,25 @@ export default function CheckoutPage() {
 
           {isCartOrder ? (
             <div className="space-y-3">
-              {items.length === 0 ? (
-                <p className="text-sm text-gray-500">Savatcha bo‘sh</p>
-              ) : (
-                items.map((item) => (
-                  <div
-                    key={`${item.id}-${item.selectedSize || ""}`}
-                    className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70"
-                  >
-                    <p className="font-semibold">{item.name}</p>
-                    {item.selectedSize ? (
-                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        O'lcham: {item.selectedSize}
-                      </p>
-                    ) : null}
+              {(items || []).map((item) => (
+                <div
+                  key={`${item.id}-${item.selectedSize || ""}`}
+                  className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70"
+                >
+                  <p className="font-semibold">{item.name}</p>
+                  {item.selectedSize ? (
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Soni: {item.quantity}
+                      O'lcham: {item.selectedSize}
                     </p>
-                    <p className="mt-1 font-bold text-violet-600">
-                      {(item.price * item.quantity).toLocaleString()} so'm
-                    </p>
-                  </div>
-                ))
-              )}
+                  ) : null}
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Soni: {item.quantity}
+                  </p>
+                  <p className="mt-1 font-bold text-violet-600">
+                    {(Number(item.price || 0) * Number(item.quantity || 0)).toLocaleString()} so'm
+                  </p>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
@@ -369,8 +355,14 @@ export default function CheckoutPage() {
             />
           </div>
 
-          <button onClick={handleDetectLocation} className="btn-secondary w-full">
-            Joylashuvni aniqlash
+          <button
+            onClick={handleDetectLocation}
+            className="btn-secondary w-full"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Navigation size={16} />
+              Joylashuvni aniqlash
+            </span>
           </button>
 
           {mapData?.mapUrl ? (
@@ -378,13 +370,9 @@ export default function CheckoutPage() {
               href={mapData.mapUrl}
               target="_blank"
               rel="noreferrer"
-              className="block overflow-hidden rounded-3xl border border-gray-200 dark:border-neutral-800"
+              className="flex items-center justify-center rounded-2xl bg-gray-100 px-4 py-3 text-sm font-semibold text-violet-600 dark:bg-neutral-800"
             >
-              <img
-                src={`https://staticmap.openstreetmap.de/staticmap.php?center=${mapData.latitude},${mapData.longitude}&zoom=15&size=600x260&markers=${mapData.latitude},${mapData.longitude},red-pushpin`}
-                alt="Xarita"
-                className="h-44 w-full object-cover"
-              />
+              Xaritada ochish
             </a>
           ) : null}
         </div>
@@ -401,25 +389,27 @@ export default function CheckoutPage() {
                 <Loader2 size={16} className="animate-spin" />
                 Yuklanmoqda...
               </div>
-            ) : (
+            ) : settings ? (
               <>
                 <p className="text-sm text-violet-100">Karta raqami</p>
                 <p className="mt-1 text-xl font-bold tracking-wider">
-                  {settings?.card_number || "Karta topilmadi"}
+                  {settings.card_number || "Karta topilmadi"}
                 </p>
 
                 <p className="mt-3 text-sm text-violet-100">Karta egasi</p>
                 <p className="font-semibold">
-                  {settings?.card_holder_name || "Noma'lum"}
+                  {settings.card_holder_name || "Noma'lum"}
                 </p>
 
-                {settings?.phone_primary ? (
+                {settings.phone_primary ? (
                   <>
                     <p className="mt-3 text-sm text-violet-100">Aloqa</p>
                     <p className="font-semibold">{settings.phone_primary}</p>
                   </>
                 ) : null}
               </>
+            ) : (
+              <div className="text-sm">Settings jadvalida karta ma'lumoti yo‘q</div>
             )}
           </div>
 

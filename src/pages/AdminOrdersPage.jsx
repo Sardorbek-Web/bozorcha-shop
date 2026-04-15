@@ -67,6 +67,15 @@ export default function AdminOrdersPage() {
     }));
   }
 
+  async function parseApiResponse(response) {
+    const raw = await response.text();
+    try {
+      return JSON.parse(raw);
+    } catch {
+      throw new Error(raw || "Serverdan noto‘g‘ri javob keldi");
+    }
+  }
+
   async function handleSendStatus(order) {
     const form = forms[order.id];
     const chatId = order.addresses?.telegram_chat_id;
@@ -115,20 +124,13 @@ export default function AdminOrdersPage() {
         }),
       });
 
-      const raw = await response.text();
-      let result = {};
+      const result = await parseApiResponse(response);
 
-      try {
-        result = JSON.parse(raw);
-      } catch {
-        throw new Error(raw || "Serverdan noto'g'ri javob keldi");
-      }
-
-      if (!result.success) {
+      if (!response.ok || !result.success) {
         throw new Error(
           typeof result.error === "string"
             ? result.error
-            : "Telegramga yuborilmadi"
+            : result.message || "Telegramga yuborilmadi"
         );
       }
 
@@ -278,8 +280,8 @@ export default function AdminOrdersPage() {
                     isCargo
                       ? "Cargo bo‘yicha izoh"
                       : form.status === "cancelled"
-                        ? "Bekor qilish sababi"
-                        : "Qo‘shimcha izoh"
+                      ? "Bekor qilish sababi"
+                      : "Qo‘shimcha izoh"
                   }
                 />
 

@@ -21,16 +21,12 @@ export default async function handler(req, res) {
       `https://api.telegram.org/bot${BOT_TOKEN}/setChatMenuButton`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           menu_button: {
             type: "web_app",
             text: "🛍 Do'konni ochish",
-            web_app: {
-              url: WEB_APP_URL,
-            },
+            web_app: { url: WEB_APP_URL },
           },
         }),
       }
@@ -42,9 +38,7 @@ export default async function handler(req, res) {
       `https://api.telegram.org/bot${BOT_TOKEN}/setMyCommands`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           commands: [
             { command: "start", description: "Botni ishga tushirish" },

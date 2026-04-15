@@ -23,8 +23,7 @@ export const useFavoritesStore = create((set, get) => ({
   favorites: [],
 
   initFavorites: () => {
-    const favorites = loadFavorites();
-    set({ favorites });
+    set({ favorites: loadFavorites() });
   },
 
   toggleFavorite: (product) => {
@@ -33,21 +32,17 @@ export const useFavoritesStore = create((set, get) => ({
     const current = Array.isArray(get().favorites) ? get().favorites : [];
     const exists = current.some((item) => item?.id === product.id);
 
-    let updated = [];
-
-    if (exists) {
-      updated = current.filter((item) => item?.id !== product.id);
-    } else {
-      updated = [
-        ...current,
-        {
-          id: product.id,
-          name: product.name || "Mahsulot",
-          price: Number(product.price || 0),
-          image: product.image || "",
-        },
-      ];
-    }
+    const updated = exists
+      ? current.filter((item) => item?.id !== product.id)
+      : [
+          ...current,
+          {
+            id: product.id,
+            name: product.name || "Mahsulot",
+            price: Number(product.price || 0),
+            image: product.image || "",
+          },
+        ];
 
     saveFavorites(updated);
     set({ favorites: updated });
@@ -56,7 +51,6 @@ export const useFavoritesStore = create((set, get) => ({
   removeFavorite: (id) => {
     const current = Array.isArray(get().favorites) ? get().favorites : [];
     const updated = current.filter((item) => item?.id !== id);
-
     saveFavorites(updated);
     set({ favorites: updated });
   },

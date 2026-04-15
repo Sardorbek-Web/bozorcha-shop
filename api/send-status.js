@@ -1,90 +1,61 @@
 function buildStatusMessage({ status, cargoWeightKg, cargoAmount, adminNote }) {
   if (status === "confirmed") {
-    return (
-      `✅ *Buyurtmangiz tasdiqlandi*\n\n` +
-      `Mahsulotingiz buyurtmaga olindi.\n` +
-      `Tez orada keyingi holat haqida xabar beramiz.`
-    );
+    return `✅ *Buyurtmangiz tasdiqlandi*\n\nTez orada keyingi holat haqida xabar beramiz.`;
   }
 
   if (status === "in_cargo") {
-    let text =
-      `🚚 *Mahsulotingiz cargo orqali yo'lga chiqdi*\n\n` +
-      `Mahsulot O'zbekistonga yo'lda.`;
+    let text = `🚚 *Mahsulotingiz cargo orqali yo'lga chiqdi*`;
 
     if (cargoWeightKg || cargoAmount) {
       text += `\n\n📦 *Cargo ma'lumoti*`;
-      if (cargoWeightKg) {
-        text += `\n• Og'irligi: *${cargoWeightKg} kg*`;
-      }
+      if (cargoWeightKg) text += `\n• Og'irligi: *${cargoWeightKg} kg*`;
       if (cargoAmount) {
         text += `\n• Cargo narxi: *${Number(cargoAmount).toLocaleString()} so'm*`;
       }
     }
 
-    if (adminNote) {
-      text += `\n\n📝 *Izoh:* ${adminNote}`;
-    }
-
+    if (adminNote) text += `\n\n📝 *Izoh:* ${adminNote}`;
     return text;
   }
 
   if (status === "delivered") {
-    let text =
-      `🎉 *Buyurtmangiz yetib keldi!*\n\n` +
-      `Mahsulotingiz yetib keldi. Tez orada siz bilan bog'lanamiz.`;
-
-    if (adminNote) {
-      text += `\n\n📝 *Izoh:* ${adminNote}`;
-    }
-
+    let text = `🎉 *Buyurtmangiz yetib keldi!*`;
+    if (adminNote) text += `\n\n📝 *Izoh:* ${adminNote}`;
     return text;
   }
 
   if (status === "cancelled") {
     let text = `❌ *Buyurtmangiz bekor qilindi*`;
-
-    if (adminNote) {
-      text += `\n\nSabab: ${adminNote}`;
-    }
-
+    if (adminNote) text += `\n\nSabab: ${adminNote}`;
     return text;
   }
 
   return `📦 Buyurtmangiz holati yangilandi.`;
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
+  if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, message: "Method not allowed" });
   }
 
   try {
     const BOT_TOKEN = process.env.BOT_TOKEN;
+    if (!BOT_TOKEN) {
+      return res.status(500).json({ success: false, error: "BOT_TOKEN topilmadi" });
+    }
 
-    const body =
-      typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-
-    const {
-      chatId,
-      status,
-      cargoWeightKg,
-      cargoAmount,
-      adminNote,
-    } = body;
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const { chatId, status, cargoWeightKg, cargoAmount, adminNote } = body || {};
 
     if (!chatId || !status) {
       return res.status(400).json({
         success: false,
-        message: "chatId yoki status yo'q",
+        error: "chatId yoki status yo'q",
       });
     }
 
@@ -99,9 +70,7 @@ module.exports = async function handler(req, res) {
       `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: chatId,
           text,
@@ -115,7 +84,7 @@ module.exports = async function handler(req, res) {
     if (!tgJson.ok) {
       return res.status(500).json({
         success: false,
-        error: tgJson,
+        error: JSON.stringify(tgJson),
       });
     }
 
@@ -127,7 +96,7 @@ module.exports = async function handler(req, res) {
     console.error("send-status error:", error);
     return res.status(500).json({
       success: false,
-      error: error.message,
+      error: error.message || "Server xatosi",
     });
   }
-};
+}

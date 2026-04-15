@@ -31,7 +31,6 @@ export default function ProductCard({ product }) {
   function handleAddToCart(e) {
     e.preventDefault();
     e.stopPropagation();
-
     if (!safeProduct.id || typeof addToCart !== "function") return;
 
     addToCart({
@@ -47,7 +46,6 @@ export default function ProductCard({ product }) {
   function handleToggleFavorite(e) {
     e.preventDefault();
     e.stopPropagation();
-
     if (!safeProduct.id || typeof toggleFavorite !== "function") return;
 
     toggleFavorite({

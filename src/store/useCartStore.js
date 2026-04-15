@@ -23,8 +23,7 @@ export const useCartStore = create((set, get) => ({
   items: [],
 
   initCart: () => {
-    const items = loadCart();
-    set({ items });
+    set({ items: loadCart() });
   },
 
   addToCart: (product) => {
@@ -68,23 +67,17 @@ export const useCartStore = create((set, get) => ({
     const updated = current.filter(
       (item) => !(item?.id === id && item?.selectedSize === selectedSize)
     );
-
     saveCart(updated);
     set({ items: updated });
   },
 
   increaseQuantity: (id, selectedSize = null) => {
     const current = Array.isArray(get().items) ? get().items : [];
-    const updated = current.map((item) => {
-      if (item?.id === id && item?.selectedSize === selectedSize) {
-        return {
-          ...item,
-          quantity: Number(item.quantity || 1) + 1,
-        };
-      }
-      return item;
-    });
-
+    const updated = current.map((item) =>
+      item?.id === id && item?.selectedSize === selectedSize
+        ? { ...item, quantity: Number(item.quantity || 1) + 1 }
+        : item
+    );
     saveCart(updated);
     set({ items: updated });
   },
@@ -92,15 +85,11 @@ export const useCartStore = create((set, get) => ({
   decreaseQuantity: (id, selectedSize = null) => {
     const current = Array.isArray(get().items) ? get().items : [];
     const updated = current
-      .map((item) => {
-        if (item?.id === id && item?.selectedSize === selectedSize) {
-          return {
-            ...item,
-            quantity: Number(item.quantity || 1) - 1,
-          };
-        }
-        return item;
-      })
+      .map((item) =>
+        item?.id === id && item?.selectedSize === selectedSize
+          ? { ...item, quantity: Number(item.quantity || 1) - 1 }
+          : item
+      )
       .filter((item) => Number(item.quantity || 0) > 0);
 
     saveCart(updated);
@@ -114,9 +103,11 @@ export const useCartStore = create((set, get) => ({
 
   getTotal: () => {
     const current = Array.isArray(get().items) ? get().items : [];
-    return current.reduce((sum, item) => {
-      return sum + Number(item?.price || 0) * Number(item?.quantity || 0);
-    }, 0);
+    return current.reduce(
+      (sum, item) =>
+        sum + Number(item?.price || 0) * Number(item?.quantity || 0),
+      0
+    );
   },
 
   getCount: () => {

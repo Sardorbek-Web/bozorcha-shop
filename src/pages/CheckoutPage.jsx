@@ -38,7 +38,7 @@ export default function CheckoutPage() {
       setPhone(profile.phone || "+998");
       setFullName(
         profile.full_name ||
-          `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
+        `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
       );
     }
   }, [profile]);
@@ -250,7 +250,14 @@ export default function CheckoutPage() {
         }),
       });
 
-      const result = await response.json();
+      const raw = await response.text();
+      let result = {};
+
+      try {
+        result = JSON.parse(raw);
+      } catch {
+        throw new Error(raw || "Serverdan noto'g'ri javob keldi");
+      }
 
       if (!result.success) {
         throw new Error(

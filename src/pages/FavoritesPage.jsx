@@ -1,92 +1,59 @@
-import { useEffect, useState } from "react";
+import { Trash2, Heart } from "lucide-react";
+import { Link } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
-import { supabase } from "../lib/supabase";
-import { useUserStore } from "../store/useUserStore";
-import ProductCard from "../components/ui/ProductCard";
 import { useFavoritesStore } from "../store/useFavoritesStore";
 
 export default function FavoritesPage() {
-  const { profile } = useUserStore();
-  const { setFavoriteIds } = useFavoritesStore();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (profile?.id) {
-      fetchFavoritesProducts();
-    } else {
-      setLoading(false);
-    }
-  }, [profile]);
-
-  async function fetchFavoritesProducts() {
-    setLoading(true);
-
-    const { data: favoriteRows, error: favoriteError } = await supabase
-      .from("favorites")
-      .select("product_id")
-      .eq("profile_id", profile.id);
-
-    if (favoriteError || !favoriteRows) {
-      setProducts([]);
-      setLoading(false);
-      return;
-    }
-
-    const ids = favoriteRows.map((item) => item.product_id);
-    setFavoriteIds(ids);
-
-    if (ids.length === 0) {
-      setProducts([]);
-      setLoading(false);
-      return;
-    }
-
-    const { data: productRows } = await supabase
-      .from("products")
-      .select(`
-        *,
-        product_images (
-          image_url
-        )
-      `)
-      .in("id", ids)
-      .order("created_at", { ascending: false });
-
-    const normalized =
-      productRows?.map((item) => ({
-        id: item.id,
-        name: item.name_uz,
-        price: Number(item.price),
-        oldPrice: item.old_price ? Number(item.old_price) : null,
-        image:
-          item.product_images?.[0]?.image_url || "https://placehold.co/400x400",
-      })) || [];
-
-    setProducts(normalized);
-    setLoading(false);
-  }
+  const favorites = useFavoritesStore((state) => state.favorites || []);
+  const removeFavorite = useFavoritesStore((state) => state.removeFavorite);
 
   return (
     <MobileLayout title="Sevimlilar">
       <div className="space-y-4 pb-24">
-        {loading && <div className="card card-dark p-6">Yuklanmoqda...</div>}
-
-        {!loading && products.length === 0 && (
-          <div className="card card-dark p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            Hozircha sevimli mahsulot yo‘q
+        {!Array.isArray(favorites) || favorites.length === 0 ? (
+          <div className="card card-dark p-6 text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-500/10">
+              <Heart size={24} />
+            </div>
+            <p className="text-base font-semibold">Sevimli mahsulotlar yo‘q</p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Mahsulotlarni yurakcha orqali saqlab qo‘ying
+            </p>
           </div>
-        )}
+        ) : (
+          favorites.map((item) => (
+            <div key={item.id} className="card card-dark flex gap-3 p-3">
+              <div className="h-24 w-24 overflow-hidden rounded-2xl bg-gray-100 dark:bg-neutral-800">
+                {item.image ? (
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+              </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onRefresh={fetchFavoritesProducts}
-            />
-          ))}
-        </div>
+              <div className="flex flex-1 flex-col justify-between">
+                <div>
+                  <Link to={`/product/${item.id}`} className="font-semibold">
+                    {item.name || "Mahsulot"}
+                  </Link>
+                  <p className="mt-1 text-violet-600 font-bold">
+                    {Number(item.price || 0).toLocaleString()} so'm
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => removeFavorite(item.id)}
+                  className="flex items-center gap-2 text-sm text-red-500"
+                >
+                  <Trash2 size={16} />
+                  Olib tashlash
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </MobileLayout>
   );

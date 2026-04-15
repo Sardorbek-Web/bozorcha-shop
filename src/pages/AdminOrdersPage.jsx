@@ -115,7 +115,14 @@ export default function AdminOrdersPage() {
         }),
       });
 
-      const result = await response.json();
+      const raw = await response.text();
+      let result = {};
+
+      try {
+        result = JSON.parse(raw);
+      } catch {
+        throw new Error(raw || "Serverdan noto'g'ri javob keldi");
+      }
 
       if (!result.success) {
         throw new Error(
@@ -271,8 +278,8 @@ export default function AdminOrdersPage() {
                     isCargo
                       ? "Cargo bo‘yicha izoh"
                       : form.status === "cancelled"
-                      ? "Bekor qilish sababi"
-                      : "Qo‘shimcha izoh"
+                        ? "Bekor qilish sababi"
+                        : "Qo‘shimcha izoh"
                   }
                 />
 

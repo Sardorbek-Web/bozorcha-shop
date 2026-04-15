@@ -5,7 +5,7 @@ import { useFavoritesStore } from "../../store/useFavoritesStore";
 
 export default function ProductCard({ product }) {
   const addToCart = useCartStore((state) => state.addToCart);
-  const favorites = useFavoritesStore((state) => state.favorites);
+  const favorites = useFavoritesStore((state) => state.favorites || []);
   const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
 
   const safeProduct = {
@@ -16,11 +16,9 @@ export default function ProductCard({ product }) {
     image: product?.image || "",
   };
 
-  const safeFavorites = Array.isArray(favorites) ? favorites : [];
-
-  const isFavorite = safeFavorites.some(
-    (item) => item?.id === safeProduct.id
-  );
+  const isFavorite = Array.isArray(favorites)
+    ? favorites.some((item) => item?.id === safeProduct.id)
+    : false;
 
   const discountPercent =
     safeProduct.oldPrice && safeProduct.oldPrice > safeProduct.price
@@ -69,12 +67,17 @@ export default function ProductCard({ product }) {
               src={safeProduct.image}
               alt={safeProduct.name}
               className="h-full w-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
             />
-          ) : (
+          ) : null}
+
+          {!safeProduct.image ? (
             <div className="flex h-full w-full items-center justify-center text-gray-400">
-              <Package2 size={42} />
+              <Package2 size={44} />
             </div>
-          )}
+          ) : null}
 
           {discountPercent ? (
             <div className="absolute left-2 top-2 rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white">

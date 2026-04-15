@@ -40,7 +40,7 @@ export default function CheckoutPage() {
       setPhone(profile.phone || "+998");
       setFullName(
         profile.full_name ||
-          `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
+        `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
       );
     }
   }, [profile]);
@@ -403,11 +403,10 @@ export default function CheckoutPage() {
             <button
               type="button"
               onClick={() => setPaymentMethod("card_transfer")}
-              className={`rounded-2xl border px-4 py-4 text-left transition ${
-                paymentMethod === "card_transfer"
+              className={`rounded-2xl border px-4 py-4 text-left transition ${paymentMethod === "card_transfer"
                   ? "border-violet-600 bg-violet-600 text-white"
                   : "border-gray-200 bg-gray-50 dark:border-neutral-700 dark:bg-neutral-800"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 <CreditCard size={18} />
@@ -421,18 +420,17 @@ export default function CheckoutPage() {
             <button
               type="button"
               onClick={() => setPaymentMethod("cash_on_delivery")}
-              className={`rounded-2xl border px-4 py-4 text-left transition ${
-                paymentMethod === "cash_on_delivery"
+              className={`rounded-2xl border px-4 py-4 text-left transition ${paymentMethod === "cash_on_delivery"
                   ? "border-violet-600 bg-violet-600 text-white"
                   : "border-gray-200 bg-gray-50 dark:border-neutral-700 dark:bg-neutral-800"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 <Wallet size={18} />
                 <span className="font-semibold">Naqd to‘lov</span>
               </div>
               <p className="mt-1 text-sm opacity-80">
-                Mahsulot kelganda qo‘lga to‘laysiz
+                Naqd to‘lov (oldindan)
               </p>
             </button>
           </div>
@@ -492,8 +490,8 @@ export default function CheckoutPage() {
         ) : (
           <div className="card card-dark p-4">
             <div className="rounded-2xl bg-gray-50 p-4 text-sm dark:bg-neutral-800/70">
-              Naqd to‘lov tanlandi. Mahsulot kelganda to‘lovni qo‘lda qilasiz.
-              Chek yuklash shart emas.
+              ⚠️ Diqqat: Naqd to‘lov tanlangan bo‘lsa ham,
+              buyurtma tasdiqlanishi uchun oldindan to‘lov amalga oshirilishi kerak.
             </div>
           </div>
         )}

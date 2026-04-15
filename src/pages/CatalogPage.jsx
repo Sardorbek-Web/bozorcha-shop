@@ -1,175 +1,93 @@
-import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import MobileLayout from "../components/layout/MobileLayout";
-import { supabase } from "../lib/supabase";
 import ProductCard from "../components/ui/ProductCard";
-import { useUserStore } from "../store/useUserStore";
-import { useFavoritesStore } from "../store/useFavoritesStore";
+import { supabase } from "../lib/supabase";
 
 export default function CatalogPage() {
-  const { profile } = useUserStore();
-  const { setFavoriteIds } = useFavoritesStore();
-
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-
+  const [imagesMap, setImagesMap] = useState({});
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [priceFrom, setPriceFrom] = useState("");
-  const [priceTo, setPriceTo] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
     fetchProducts();
-  }, [search, selectedCategory, priceFrom, priceTo]);
-
-  useEffect(() => {
-    if (profile?.id) {
-      fetchFavorites();
-    }
-  }, [profile]);
-
-  async function fetchFavorites() {
-    const { data, error } = await supabase
-      .from("favorites")
-      .select("product_id")
-      .eq("profile_id", profile.id);
-
-    if (!error && data) {
-      setFavoriteIds(data.map((item) => item.product_id));
-    }
-  }
-
-  async function fetchCategories() {
-    const { data } = await supabase
-      .from("categories")
-      .select("*")
-      .order("created_at");
-
-    setCategories(data || []);
-  }
+  }, []);
 
   async function fetchProducts() {
     setLoading(true);
 
-    let query = supabase
+    const { data: productsData, error: productsError } = await supabase
       .from("products")
-      .select(`
-        *,
-        product_images (
-          image_url
-        )
-      `)
+      .select("*")
+      .eq("is_active", true)
       .order("created_at", { ascending: false });
 
-    if (search) {
-      query = query.ilike("name_uz", `%${search}%`);
+    if (productsError) {
+      console.error(productsError);
+      setLoading(false);
+      return;
     }
 
-    if (selectedCategory) {
-      query = query.eq("category_id", selectedCategory);
+    setProducts(productsData || []);
+
+    const ids = (productsData || []).map((item) => item.id);
+
+    if (ids.length > 0) {
+      const { data: imagesData, error: imagesError } = await supabase
+        .from("product_images")
+        .select("product_id, image_url, sort_order")
+        .in("product_id", ids)
+        .order("sort_order", { ascending: true });
+
+      if (!imagesError) {
+        const map = {};
+        (imagesData || []).forEach((img) => {
+          if (!map[img.product_id]) {
+            map[img.product_id] = img.image_url;
+          }
+        });
+        setImagesMap(map);
+      }
     }
 
-    if (priceFrom) {
-      query = query.gte("price", Number(priceFrom));
-    }
-
-    if (priceTo) {
-      query = query.lte("price", Number(priceTo));
-    }
-
-    const { data } = await query;
-
-    const normalized =
-      data?.map((item) => ({
-        id: item.id,
-        name: item.name_uz,
-        price: Number(item.price),
-        oldPrice: item.old_price ? Number(item.old_price) : null,
-        image:
-          item.product_images?.[0]?.image_url || "https://placehold.co/400x400",
-      })) || [];
-
-    setProducts(normalized);
     setLoading(false);
   }
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((item) =>
+      (item.name_uz || "").toLowerCase().includes(search.toLowerCase())
+    );
+  }, [products, search]);
+
+  const uiProducts = filteredProducts.map((product) => ({
+    id: product.id,
+    name: product.name_uz,
+    price: product.price,
+    oldPrice: product.old_price,
+    image: imagesMap[product.id] || "",
+  }));
 
   return (
     <MobileLayout title="Katalog">
       <div className="space-y-4 pb-24">
-        <div className="flex items-center gap-2 rounded-2xl bg-gray-100 p-3 dark:bg-neutral-800">
-          <Search size={18} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Mahsulot qidirish..."
-            className="w-full bg-transparent text-sm outline-none"
-          />
-        </div>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="input"
+          placeholder="Mahsulot qidirish"
+        />
 
-        <div className="flex gap-2 overflow-x-auto">
-          <button
-            onClick={() => setSelectedCategory("")}
-            className={`rounded-xl px-4 py-2 text-sm ${
-              selectedCategory === ""
-                ? "bg-violet-600 text-white"
-                : "bg-gray-100 dark:bg-neutral-800"
-            }`}
-          >
-            Hammasi
-          </button>
-
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm ${
-                selectedCategory === cat.id
-                  ? "bg-violet-600 text-white"
-                  : "bg-gray-100 dark:bg-neutral-800"
-              }`}
-            >
-              {cat.name_uz}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <input
-            placeholder="Min narx"
-            value={priceFrom}
-            onChange={(e) => setPriceFrom(e.target.value)}
-            className="input"
-          />
-          <input
-            placeholder="Max narx"
-            value={priceTo}
-            onChange={(e) => setPriceTo(e.target.value)}
-            className="input"
-          />
-        </div>
-
-        {loading && <div className="card card-dark p-6">Yuklanmoqda...</div>}
-
-        {!loading && products.length === 0 && (
-          <div className="card card-dark p-6 text-center text-sm text-gray-500">
-            Hech narsa topilmadi
+        {loading ? (
+          <div className="card card-dark p-6">Yuklanmoqda...</div>
+        ) : uiProducts.length === 0 ? (
+          <div className="card card-dark p-6">Mahsulot topilmadi</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {uiProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
           </div>
         )}
-
-        <div className="grid grid-cols-2 gap-3">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onRefresh={fetchFavorites}
-            />
-          ))}
-        </div>
       </div>
     </MobileLayout>
   );

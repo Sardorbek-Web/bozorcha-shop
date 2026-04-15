@@ -1,82 +1,87 @@
-import { Footprints, Shirt, Smartphone, Watch, Flame } from "lucide-react";
+import { useEffect, useState } from "react";
 import MobileLayout from "../components/layout/MobileLayout";
-import PromoBanner from "../components/ui/PromoBanner";
-import SectionHeader from "../components/ui/SectionHeader";
-import CategoryCard from "../components/ui/CategoryCard";
 import ProductCard from "../components/ui/ProductCard";
-
-const categories = [
-  { id: 1, name: "Kiyimlar", subtitle: "Trend kolleksiya", icon: Shirt },
-  { id: 2, name: "Oyoq kiyim", subtitle: "Qulay va zamonaviy", icon: Footprints },
-  { id: 3, name: "Elektronika", subtitle: "Smart texnika", icon: Smartphone },
-  { id: 4, name: "Aksessuarlar", subtitle: "Ko'rinishni to'ldiradi", icon: Watch },
-];
-
-const products = [
-  {
-    id: 1,
-    name: "Nike uslubidagi zamonaviy krossovka",
-    price: 299000,
-    oldPrice: 359000,
-    image: "https://placehold.co/400x400",
-  },
-  {
-    id: 2,
-    name: "Ayollar uchun premium sumka",
-    price: 189000,
-    oldPrice: 229000,
-    image: "https://placehold.co/400x400",
-  },
-  {
-    id: 3,
-    name: "Wireless quloqchin",
-    price: 149000,
-    oldPrice: 179000,
-    image: "https://placehold.co/400x400",
-  },
-  {
-    id: 4,
-    name: "Erkaklar oversize futbolkasi",
-    price: 119000,
-    oldPrice: 149000,
-    image: "https://placehold.co/400x400",
-  },
-];
+import { supabase } from "../lib/supabase";
 
 export default function HomePage() {
+  const [products, setProducts] = useState([]);
+  const [imagesMap, setImagesMap] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  async function fetchProducts() {
+    setLoading(true);
+
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (productsError) {
+      console.error(productsError);
+      setLoading(false);
+      return;
+    }
+
+    setProducts(productsData || []);
+
+    const ids = (productsData || []).map((item) => item.id);
+
+    if (ids.length > 0) {
+      const { data: imagesData, error: imagesError } = await supabase
+        .from("product_images")
+        .select("product_id, image_url, sort_order")
+        .in("product_id", ids)
+        .order("sort_order", { ascending: true });
+
+      if (!imagesError) {
+        const map = {};
+        (imagesData || []).forEach((img) => {
+          if (!map[img.product_id]) {
+            map[img.product_id] = img.image_url;
+          }
+        });
+        setImagesMap(map);
+      }
+    }
+
+    setLoading(false);
+  }
+
+  const uiProducts = products.map((product) => ({
+    id: product.id,
+    name: product.name_uz,
+    price: product.price,
+    oldPrice: product.old_price,
+    image: imagesMap[product.id] || "",
+    isNew: false,
+  }));
+
   return (
     <MobileLayout title="Bozorcha">
-      <div className="space-y-6">
-        <PromoBanner />
+      <div className="space-y-4 pb-24">
+        <section className="card card-dark p-4">
+          <h2 className="text-xl font-bold">Aksiya</h2>
 
-        <section>
-          <SectionHeader title="Kategoriyalar" />
-          <div className="grid grid-cols-2 gap-3">
-            {categories.map((category) => (
-              <CategoryCard
-                key={category.id}
-                title={category.name}
-                subtitle={category.subtitle}
-                icon={category.icon}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-lg font-bold tracking-tight">Aksiya</h3>
-            <div className="inline-flex items-center gap-1 text-sm font-semibold text-orange-500">
-              <Flame size={16} />
-              Hot
+          {loading ? (
+            <div className="mt-4 rounded-2xl bg-gray-50 p-6 text-sm dark:bg-neutral-800">
+              Yuklanmoqda...
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          ) : uiProducts.length === 0 ? (
+            <div className="mt-4 rounded-2xl bg-gray-50 p-6 text-sm dark:bg-neutral-800">
+              Hozircha mahsulotlar yo‘q
+            </div>
+          ) : (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {uiProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </MobileLayout>

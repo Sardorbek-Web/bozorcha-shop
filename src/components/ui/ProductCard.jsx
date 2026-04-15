@@ -1,119 +1,83 @@
 import { Heart, ShoppingCart } from "lucide-react";
 import { Link } from "react-router-dom";
-import { supabase } from "../../lib/supabase";
-import { useUserStore } from "../../store/useUserStore";
-import { useFavoritesStore } from "../../store/useFavoritesStore";
 import { useCartStore } from "../../store/useCartStore";
+import { useFavoritesStore } from "../../store/useFavoritesStore";
 
-export default function ProductCard({ product, onRefresh }) {
-  const { profile } = useUserStore();
-  const { favoriteIds, setFavoriteIds } = useFavoritesStore();
-  const { addToCart } = useCartStore();
+export default function ProductCard({ product }) {
+  const addToCart = useCartStore((state) => state.addToCart);
+  const { favorites, toggleFavorite } = useFavoritesStore();
 
-  const isFavorite = favoriteIds.includes(product.id);
+  const isFavorite = favorites.some((item) => item.id === product.id);
 
-  async function toggleFavorite(e) {
-    e.preventDefault();
-    e.stopPropagation();
+  const imageSrc =
+    product.image && product.image.trim() !== ""
+      ? product.image
+      : "https://placehold.co/400x400?text=Bozorcha";
 
-    if (!profile?.id) {
-      alert("Avval Telegram orqali kirish kerak");
-      return;
-    }
-
-    if (isFavorite) {
-      const { error } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("profile_id", profile.id)
-        .eq("product_id", product.id);
-
-      if (!error) {
-        setFavoriteIds(favoriteIds.filter((id) => id !== product.id));
-        onRefresh?.();
-      }
-    } else {
-      const { error } = await supabase.from("favorites").insert([
-        {
-          profile_id: profile.id,
-          product_id: product.id,
-        },
-      ]);
-
-      if (!error) {
-        setFavoriteIds([...favoriteIds, product.id]);
-        onRefresh?.();
-      }
-    }
-  }
-
-  function handleAddToCart(e) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    addToCart(product);
-  }
-
-  const discountPercent = product.oldPrice
-    ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
-    : 0;
+  const discountPercent =
+    product.oldPrice && product.price
+      ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
+      : null;
 
   return (
-    <Link
-      to={`/product/${product.id}`}
-      className="card card-dark overflow-hidden transition hover:-translate-y-0.5"
-    >
-      <div className="relative">
-        <img
-          src={product.image || "https://placehold.co/400x400"}
-          alt={product.name}
-          className="h-44 w-full object-cover"
-        />
+    <div className="overflow-hidden rounded-[22px] border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 dark:border-neutral-800 dark:bg-neutral-900">
+      <Link to={`/product/${product.id}`} className="block">
+        <div className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-neutral-800">
+          <img
+            src={imageSrc}
+            alt={product.name}
+            className="h-full w-full object-cover"
+          />
 
-        <button
-          onClick={toggleFavorite}
-          className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full shadow-sm backdrop-blur ${
-            isFavorite
-              ? "bg-red-500 text-white"
-              : "bg-white/90 text-gray-700"
-          }`}
-          type="button"
-        >
-          <Heart size={16} fill={isFavorite ? "currentColor" : "none"} />
-        </button>
+          {discountPercent ? (
+            <div className="absolute left-2 top-2 rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white">
+              -{discountPercent}%
+            </div>
+          ) : null}
 
-        {discountPercent > 0 && (
-          <div className="absolute left-3 top-3">
-            <span className="badge-sale">-{discountPercent}%</span>
-          </div>
-        )}
-      </div>
-
-      <div className="p-3">
-        <p className="min-h-[44px] text-sm font-semibold leading-5">
-          {product.name}
-        </p>
-
-        <div className="mt-2">
-          {product.oldPrice && (
-            <p className="text-xs text-gray-400 line-through">
-              {product.oldPrice.toLocaleString()} so'm
-            </p>
-          )}
-          <p className="mt-1 text-base font-bold text-violet-600">
-            {product.price.toLocaleString()} so'm
-          </p>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              toggleFavorite(product);
+            }}
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow dark:bg-neutral-900/90 dark:text-gray-200"
+          >
+            <Heart
+              size={16}
+              className={isFavorite ? "fill-red-500 text-red-500" : ""}
+            />
+          </button>
         </div>
 
+        <div className="space-y-2 p-3">
+          <h3 className="line-clamp-2 min-h-[38px] text-sm font-semibold">
+            {product.name}
+          </h3>
+
+          <div className="space-y-1">
+            {product.oldPrice ? (
+              <p className="text-xs text-gray-400 line-through">
+                {Number(product.oldPrice).toLocaleString()} so'm
+              </p>
+            ) : null}
+
+            <p className="text-base font-bold text-violet-600">
+              {Number(product.price).toLocaleString()} so'm
+            </p>
+          </div>
+        </div>
+      </Link>
+
+      <div className="px-3 pb-3">
         <button
-          onClick={handleAddToCart}
-          className="btn-primary mt-3 flex w-full items-center justify-center gap-2"
-          type="button"
+          onClick={() => addToCart(product)}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 py-2.5 text-sm font-semibold text-white"
         >
           <ShoppingCart size={16} />
           Savatchaga
         </button>
       </div>
-    </Link>
+    </div>
   );
 }

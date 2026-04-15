@@ -1,77 +1,126 @@
 import { create } from "zustand";
 
+function loadCart() {
+  try {
+    const raw = localStorage.getItem("cart");
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error("cart load xato:", error);
+    return [];
+  }
+}
+
+function saveCart(items) {
+  try {
+    localStorage.setItem("cart", JSON.stringify(items));
+  } catch (error) {
+    console.error("cart save xato:", error);
+  }
+}
+
 export const useCartStore = create((set, get) => ({
   items: [],
 
+  initCart: () => {
+    const items = loadCart();
+    set({ items });
+  },
+
   addToCart: (product) => {
-    const items = get().items;
+    if (!product?.id) return;
 
-    const existing = items.find((item) => item.id === product.id);
+    const current = Array.isArray(get().items) ? get().items : [];
+    const selectedSize = product.selectedSize || null;
 
-    if (existing) {
-      set({
-        items: items.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        ),
-      });
+    const existingIndex = current.findIndex(
+      (item) => item?.id === product.id && item?.selectedSize === selectedSize
+    );
+
+    let updated = [];
+
+    if (existingIndex !== -1) {
+      updated = [...current];
+      updated[existingIndex] = {
+        ...updated[existingIndex],
+        quantity: Number(updated[existingIndex].quantity || 1) + 1,
+      };
     } else {
-      set({
-        items: [
-          ...items,
-          {
-            ...product,
-            quantity: 1,
-          },
-        ],
-      });
+      updated = [
+        ...current,
+        {
+          id: product.id,
+          name: product.name || "Mahsulot",
+          price: Number(product.price || 0),
+          image: product.image || "",
+          selectedSize,
+          quantity: 1,
+        },
+      ];
     }
+
+    saveCart(updated);
+    set({ items: updated });
   },
 
-  removeFromCart: (id) => {
-    set({
-      items: get().items.filter((item) => item.id !== id),
-    });
+  removeFromCart: (id, selectedSize = null) => {
+    const current = Array.isArray(get().items) ? get().items : [];
+    const updated = current.filter(
+      (item) => !(item?.id === id && item?.selectedSize === selectedSize)
+    );
+
+    saveCart(updated);
+    set({ items: updated });
   },
 
-  increase: (id) => {
-    set({
-      items: get().items.map((item) =>
-        item.id === id
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      ),
+  increaseQuantity: (id, selectedSize = null) => {
+    const current = Array.isArray(get().items) ? get().items : [];
+    const updated = current.map((item) => {
+      if (item?.id === id && item?.selectedSize === selectedSize) {
+        return {
+          ...item,
+          quantity: Number(item.quantity || 1) + 1,
+        };
+      }
+      return item;
     });
+
+    saveCart(updated);
+    set({ items: updated });
   },
 
-  decrease: (id) => {
-    set({
-      items: get()
-        .items.map((item) =>
-          item.id === id
-            ? { ...item, quantity: item.quantity - 1 }
-            : item
-        )
-        .filter((item) => item.quantity > 0),
-    });
+  decreaseQuantity: (id, selectedSize = null) => {
+    const current = Array.isArray(get().items) ? get().items : [];
+    const updated = current
+      .map((item) => {
+        if (item?.id === id && item?.selectedSize === selectedSize) {
+          return {
+            ...item,
+            quantity: Number(item.quantity || 1) - 1,
+          };
+        }
+        return item;
+      })
+      .filter((item) => Number(item.quantity || 0) > 0);
+
+    saveCart(updated);
+    set({ items: updated });
   },
 
   clearCart: () => {
+    saveCart([]);
     set({ items: [] });
   },
 
   getTotal: () => {
-    return get().items.reduce(
-      (sum, item) => sum + Number(item.price) * Number(item.quantity),
-      0
-    );
+    const current = Array.isArray(get().items) ? get().items : [];
+    return current.reduce((sum, item) => {
+      return sum + Number(item?.price || 0) * Number(item?.quantity || 0);
+    }, 0);
   },
 
   getCount: () => {
-    return get().items.reduce(
-      (sum, item) => sum + Number(item.quantity),
-      0
-    );
+    const current = Array.isArray(get().items) ? get().items : [];
+    return current.reduce((sum, item) => sum + Number(item?.quantity || 0), 0);
   },
 }));

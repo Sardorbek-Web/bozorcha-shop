@@ -65,9 +65,4 @@ export const useFavoritesStore = create((set, get) => ({
     saveFavorites([]);
     set({ favorites: [] });
   },
-
-  isFavorite: (id) => {
-    const current = Array.isArray(get().favorites) ? get().favorites : [];
-    return current.some((item) => item?.id === id);
-  },
 }));

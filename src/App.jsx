@@ -12,8 +12,8 @@ export default function App() {
   const initFavorites = useFavoritesStore((state) => state.initFavorites);
 
   useEffect(() => {
-    initCart();
-    initFavorites();
+    if (typeof initCart === "function") initCart();
+    if (typeof initFavorites === "function") initFavorites();
   }, [initCart, initFavorites]);
 
   useEffect(() => {
@@ -36,7 +36,9 @@ export default function App() {
           telegram_id: telegramUser.id,
           first_name: telegramUser.first_name || "",
           last_name: telegramUser.last_name || "",
-          full_name: `${telegramUser.first_name || ""} ${telegramUser.last_name || ""}`.trim(),
+          full_name: `${telegramUser.first_name || ""} ${
+            telegramUser.last_name || ""
+          }`.trim(),
           username: telegramUser.username || "",
           photo_url: telegramUser.photo_url || "",
         };

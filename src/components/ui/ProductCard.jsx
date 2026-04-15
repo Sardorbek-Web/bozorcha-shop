@@ -5,10 +5,8 @@ import { useFavoritesStore } from "../../store/useFavoritesStore";
 
 export default function ProductCard({ product }) {
   const addToCart = useCartStore((state) => state.addToCart);
-  const favorites = useFavoritesStore((state) => state.favorites || []);
-  const toggleFavorite = useFavoritesStore(
-    (state) => state.toggleFavorite || (() => {})
-  );
+  const favorites = useFavoritesStore((state) => state.favorites);
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
 
   const safeProduct = {
     id: product?.id ?? "",
@@ -16,13 +14,13 @@ export default function ProductCard({ product }) {
     price: Number(product?.price || 0),
     oldPrice: product?.oldPrice ? Number(product.oldPrice) : null,
     image: product?.image || "",
-    selectedSize: product?.selectedSize || null,
-    quantity: product?.quantity || 1,
   };
 
-  const isFavorite = Array.isArray(favorites)
-    ? favorites.some((item) => item?.id === safeProduct.id)
-    : false;
+  const safeFavorites = Array.isArray(favorites) ? favorites : [];
+
+  const isFavorite = safeFavorites.some(
+    (item) => item?.id === safeProduct.id
+  );
 
   const discountPercent =
     safeProduct.oldPrice && safeProduct.oldPrice > safeProduct.price
@@ -36,7 +34,7 @@ export default function ProductCard({ product }) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!safeProduct.id) return;
+    if (!safeProduct.id || typeof addToCart !== "function") return;
 
     addToCart({
       id: safeProduct.id,
@@ -52,6 +50,8 @@ export default function ProductCard({ product }) {
     e.preventDefault();
     e.stopPropagation();
 
+    if (!safeProduct.id || typeof toggleFavorite !== "function") return;
+
     toggleFavorite({
       id: safeProduct.id,
       name: safeProduct.name,
@@ -61,7 +61,7 @@ export default function ProductCard({ product }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-[22px] border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="overflow-hidden rounded-[22px] border border-gray-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <Link to={`/product/${safeProduct.id}`} className="block">
         <div className="relative aspect-square overflow-hidden bg-gray-100 dark:bg-neutral-800">
           {safeProduct.image ? (

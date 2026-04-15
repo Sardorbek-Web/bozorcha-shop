@@ -4,9 +4,7 @@ import {
   Phone,
   MapPin,
   Image,
-  CheckCircle2,
-  XCircle,
-  Clock3,
+  Send,
   Eye,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -18,6 +16,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [forms, setForms] = useState({});
 
   useEffect(() => {
     fetchOrders();
@@ -47,6 +46,17 @@ export default function AdminOrdersPage() {
 
     if (!error && data) {
       setOrders(data);
+
+      const initialForms = {};
+      data.forEach((order) => {
+        initialForms[order.id] = {
+          status: order.status || "new",
+          cargoWeightKg: order.cargo_weight_kg || "",
+          cargoAmount: order.cargo_amount || "",
+          adminNote: order.admin_note || "",
+        };
+      });
+      setForms(initialForms);
     } else {
       console.error(error);
     }
@@ -54,37 +64,69 @@ export default function AdminOrdersPage() {
     setLoading(false);
   }
 
-  async function updateStatus(orderId, status) {
-    const { data, error } = await supabase
-      .from("orders")
-      .update({ status })
-      .eq("id", orderId)
-      .select(`
-        *,
-        addresses (
-          telegram_chat_id
-        )
-      `)
-      .single();
+  function updateForm(orderId, field, value) {
+    setForms((prev) => ({
+      ...prev,
+      [orderId]: {
+        ...prev[orderId],
+        [field]: value,
+      },
+    }));
+  }
 
-    if (!error && data) {
-      const chatId = data.addresses?.telegram_chat_id;
+  async function handleSendStatus(order) {
+    const form = forms[order.id];
+    const chatId = order.addresses?.telegram_chat_id;
 
-      if (chatId) {
-        await fetch(`${API_URL}/send-status`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            chatId,
-            status,
-          }),
-        });
-      }
-
-      fetchOrders();
+    if (!chatId) {
+      alert("Bu buyurtmada telegram_chat_id topilmadi");
+      return;
     }
+
+    const payload = {
+      status: form.status,
+      cargo_weight_kg:
+        form.cargoWeightKg === "" ? null : Number(form.cargoWeightKg),
+      cargo_amount:
+        form.cargoAmount === "" ? null : Number(form.cargoAmount),
+      admin_note: form.adminNote || null,
+    };
+
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update(payload)
+      .eq("id", order.id);
+
+    if (updateError) {
+      alert("Order update bo‘lmadi");
+      console.error(updateError);
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/send-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chatId,
+        status: form.status,
+        cargoWeightKg: form.cargoWeightKg,
+        cargoAmount: form.cargoAmount,
+        adminNote: form.adminNote,
+      }),
+    });
+
+    const result = await res.json();
+
+    if (!result.success) {
+      alert("Telegramga yuborishda xatolik");
+      console.error(result);
+      return;
+    }
+
+    alert("Status mijozga yuborildi ✅");
+    fetchOrders();
   }
 
   if (loading) {
@@ -106,12 +148,12 @@ export default function AdminOrdersPage() {
 
         {orders.map((order) => {
           const address = order.addresses;
+          const form = forms[order.id] || {};
 
           return (
-            <div key={order.id} className="card card-dark space-y-3 p-4">
+            <div key={order.id} className="card card-dark space-y-4 p-4">
               <div className="flex items-center justify-between">
                 <p className="font-bold">#{order.id.slice(0, 6)}</p>
-
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs dark:bg-neutral-800">
                   {order.status}
                 </span>
@@ -161,37 +203,58 @@ export default function AdminOrdersPage() {
                 Batafsil ko‘rish
               </Link>
 
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button
-                  onClick={() => updateStatus(order.id, "confirmed")}
-                  className="flex items-center justify-center gap-1 rounded-xl bg-green-500 py-2 text-sm text-white"
+              <div className="space-y-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/60">
+                <select
+                  value={form.status || "new"}
+                  onChange={(e) =>
+                    updateForm(order.id, "status", e.target.value)
+                  }
+                  className="input"
                 >
-                  <CheckCircle2 size={14} />
-                  Tasdiqlash
-                </button>
+                  <option value="new">Yangi</option>
+                  <option value="confirmed">Tasdiqlangan</option>
+                  <option value="in_cargo">Cargo yo'lida</option>
+                  <option value="delivered">Yetib keldi</option>
+                  <option value="cancelled">Bekor qilindi</option>
+                </select>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="number"
+                    value={form.cargoWeightKg || ""}
+                    onChange={(e) =>
+                      updateForm(order.id, "cargoWeightKg", e.target.value)
+                    }
+                    className="input"
+                    placeholder="Cargo kg"
+                  />
+
+                  <input
+                    type="number"
+                    value={form.cargoAmount || ""}
+                    onChange={(e) =>
+                      updateForm(order.id, "cargoAmount", e.target.value)
+                    }
+                    className="input"
+                    placeholder="Cargo narxi"
+                  />
+                </div>
+
+                <textarea
+                  value={form.adminNote || ""}
+                  onChange={(e) =>
+                    updateForm(order.id, "adminNote", e.target.value)
+                  }
+                  className="input min-h-[90px] resize-none"
+                  placeholder="Izoh yoki sabab yozing"
+                />
 
                 <button
-                  onClick={() => updateStatus(order.id, "cancelled")}
-                  className="flex items-center justify-center gap-1 rounded-xl bg-red-500 py-2 text-sm text-white"
+                  onClick={() => handleSendStatus(order)}
+                  className="btn-primary flex w-full items-center justify-center gap-2"
                 >
-                  <XCircle size={14} />
-                  Bekor qilish
-                </button>
-
-                <button
-                  onClick={() => updateStatus(order.id, "in_cargo")}
-                  className="flex items-center justify-center gap-1 rounded-xl bg-orange-500 py-2 text-sm text-white"
-                >
-                  <Clock3 size={14} />
-                  Cargo
-                </button>
-
-                <button
-                  onClick={() => updateStatus(order.id, "delivered")}
-                  className="flex items-center justify-center gap-1 rounded-xl bg-blue-500 py-2 text-sm text-white"
-                >
-                  <CheckCircle2 size={14} />
-                  Yetkazildi
+                  <Send size={16} />
+                  Mijozga yuborish
                 </button>
               </div>
             </div>

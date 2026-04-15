@@ -15,55 +15,67 @@ export default function HomePage() {
   async function fetchProducts() {
     setLoading(true);
 
-    const { data: productsData, error: productsError } = await supabase
-      .from("products")
-      .select("*")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
+    try {
+      const { data: productsData, error: productsError } = await supabase
+        .from("products")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
 
-    if (productsError) {
-      console.error(productsError);
-      setLoading(false);
-      return;
-    }
+      if (productsError) throw productsError;
 
-    setProducts(productsData || []);
+      const safeProducts = Array.isArray(productsData) ? productsData : [];
+      setProducts(safeProducts);
 
-    const ids = (productsData || []).map((item) => item.id);
+      const ids = safeProducts.map((item) => item.id).filter(Boolean);
 
-    if (ids.length > 0) {
-      const { data: imagesData, error: imagesError } = await supabase
-        .from("product_images")
-        .select("product_id, image_url, sort_order")
-        .in("product_id", ids)
-        .order("sort_order", { ascending: true });
+      if (ids.length > 0) {
+        const { data: imagesData, error: imagesError } = await supabase
+          .from("product_images")
+          .select("product_id, image_url, sort_order")
+          .in("product_id", ids)
+          .order("sort_order", { ascending: true });
 
-      if (!imagesError) {
+        if (imagesError) throw imagesError;
+
         const map = {};
         (imagesData || []).forEach((img) => {
-          if (!map[img.product_id]) {
-            map[img.product_id] = img.image_url;
+          if (img?.product_id && !map[img.product_id]) {
+            map[img.product_id] = img.image_url || "";
           }
         });
         setImagesMap(map);
+      } else {
+        setImagesMap({});
       }
+    } catch (error) {
+      console.error("HomePage xato:", error);
+      setProducts([]);
+      setImagesMap({});
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   const uiProducts = products.map((product) => ({
-    id: product.id,
-    name: product.name_uz,
-    price: product.price,
-    oldPrice: product.old_price,
+    id: product?.id,
+    name: product?.name_uz || product?.name_ru || "Mahsulot",
+    price: Number(product?.price || 0),
+    oldPrice: product?.old_price ? Number(product.old_price) : null,
     image: imagesMap[product.id] || "",
-    isNew: false,
   }));
 
   return (
     <MobileLayout title="Bozorcha">
       <div className="space-y-4 pb-24">
+        <section className="overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-600 via-fuchsia-500 to-indigo-500 p-5 text-white shadow-xl">
+          <p className="text-sm text-violet-100">Bozorcha</p>
+          <h1 className="mt-1 text-2xl font-bold">Yangi mahsulotlar</h1>
+          <p className="mt-2 text-sm text-violet-100">
+            Eng sara mahsulotlarni qulay narxlarda tanlang
+          </p>
+        </section>
+
         <section className="card card-dark p-4">
           <h2 className="text-xl font-bold">Aksiya</h2>
 

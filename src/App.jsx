@@ -2,10 +2,19 @@ import { useEffect } from "react";
 import { AppRouter } from "./app/router";
 import { initTelegramApp } from "./lib/telegram";
 import { useUserStore } from "./store/useUserStore";
+import { useCartStore } from "./store/useCartStore";
+import { useFavoritesStore } from "./store/useFavoritesStore";
 import { supabase } from "./lib/supabase";
 
 export default function App() {
   const { setTelegramUser, setProfile } = useUserStore();
+  const initCart = useCartStore((state) => state.initCart);
+  const initFavorites = useFavoritesStore((state) => state.initFavorites);
+
+  useEffect(() => {
+    initCart();
+    initFavorites();
+  }, [initCart, initFavorites]);
 
   useEffect(() => {
     async function setupTelegram() {

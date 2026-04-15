@@ -1,8 +1,42 @@
 import { useEffect, useState } from "react";
-import { Package, Phone, MapPin, Image, Send, Eye } from "lucide-react";
+import {
+  Package,
+  Phone,
+  MapPin,
+  Image,
+  Send,
+  Eye,
+  Wallet,
+  CreditCard,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
+
+function getPaymentLabel(paymentMethod) {
+  if (paymentMethod === "cash_on_delivery") return "Naqd to'lov";
+  if (paymentMethod === "card_transfer") return "Karta orqali to'lov";
+  return "Noma'lum";
+}
+
+function getPaymentIcon(paymentMethod) {
+  return paymentMethod === "cash_on_delivery" ? Wallet : CreditCard;
+}
+
+function getStatusBadge(status) {
+  switch (status) {
+    case "confirmed":
+      return "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-300";
+    case "in_cargo":
+      return "bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300";
+    case "delivered":
+      return "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300";
+    case "cancelled":
+      return "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300";
+    default:
+      return "bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-gray-300";
+  }
+}
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -51,7 +85,8 @@ export default function AdminOrdersPage() {
       });
       setForms(initialForms);
     } else {
-      console.error(error);
+      console.error("Buyurtmalarni olishda xatolik:", error);
+      setOrders([]);
     }
 
     setLoading(false);
@@ -69,10 +104,11 @@ export default function AdminOrdersPage() {
 
   async function parseApiResponse(response) {
     const raw = await response.text();
+
     try {
       return JSON.parse(raw);
     } catch {
-      throw new Error(raw || "Serverdan noto‘g‘ri javob keldi");
+      throw new Error(raw || "Serverdan noto'g'ri javob keldi");
     }
   }
 
@@ -137,7 +173,7 @@ export default function AdminOrdersPage() {
       alert("Mijozga yuborildi ✅");
       fetchOrders();
     } catch (error) {
-      console.error(error);
+      console.error("Status yuborishda xatolik:", error);
       alert(`Xatolik: ${error.message}`);
     } finally {
       setSendingId("");
@@ -165,13 +201,18 @@ export default function AdminOrdersPage() {
           const address = order.addresses;
           const form = forms[order.id] || {};
           const isCargo = form.status === "in_cargo";
+          const PaymentIcon = getPaymentIcon(order.payment_method);
 
           return (
             <div key={order.id} className="card card-dark space-y-4 p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-bold">#{order.id.slice(0, 6)}</p>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs dark:bg-neutral-800">
-                  {order.status}
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-bold">#{String(order.id).slice(0, 6)}</p>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusBadge(
+                    order.status
+                  )}`}
+                >
+                  {order.status || "new"}
                 </span>
               </div>
 
@@ -189,6 +230,11 @@ export default function AdminOrdersPage() {
                 <div className="flex items-center gap-2">
                   <MapPin size={14} />
                   <span>{address?.address_line || "-"}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <PaymentIcon size={14} />
+                  <span>{getPaymentLabel(order.payment_method)}</span>
                 </div>
 
                 {address?.map_url ? (
@@ -221,6 +267,10 @@ export default function AdminOrdersPage() {
                   <Image size={16} />
                   Chekni ko‘rish
                 </a>
+              ) : order.payment_method === "cash_on_delivery" ? (
+                <div className="rounded-xl bg-gray-100 px-3 py-2 text-sm dark:bg-neutral-800">
+                  Naqd to‘lov tanlangan, chek yo‘q
+                </div>
               ) : null}
 
               <Link

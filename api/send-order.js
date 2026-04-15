@@ -31,7 +31,13 @@ export default async function handler(req, res) {
       deliveryText,
       receiptUrl,
       mapUrl,
+      paymentMethod,
     } = body || {};
+
+    const paymentText =
+      paymentMethod === "cash_on_delivery"
+        ? "💵 To'lov usuli: Naqd to'lov"
+        : "💳 To'lov usuli: Karta orqali to'lov";
 
     const text =
       `🛒 *Yangi buyurtma!*\n\n` +
@@ -42,7 +48,8 @@ export default async function handler(req, res) {
       `📦 Mahsulot: ${productName || "-"}\n` +
       `📏 O'lcham: ${selectedSize || "Tanlanmagan"}\n` +
       `💰 Narx: ${Number(productPrice || 0).toLocaleString()} so'm\n` +
-      `🚚 Yetkazib berish: ${deliveryText || "10-12 kun"}`;
+      `🚚 Yetkazib berish: ${deliveryText || "10-12 kun"}\n` +
+      `${paymentText}`;
 
     const msgRes = await fetch(
       `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
@@ -66,7 +73,7 @@ export default async function handler(req, res) {
       });
     }
 
-    if (receiptUrl) {
+    if (paymentMethod === "card_transfer" && receiptUrl) {
       const isImage =
         receiptUrl.endsWith(".jpg") ||
         receiptUrl.endsWith(".jpeg") ||

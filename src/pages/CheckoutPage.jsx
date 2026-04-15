@@ -8,6 +8,7 @@ import {
   User,
   Phone,
   MapPin,
+  Wallet,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
@@ -27,6 +28,7 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [receipt, setReceipt] = useState(null);
   const [mapData, setMapData] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState("card_transfer");
 
   const [settings, setSettings] = useState(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -115,31 +117,40 @@ export default function CheckoutPage() {
     setMessage("");
 
     if (!fullName.trim()) return setMessage("Ism kiriting");
-    if (!phone.trim() || phone.length < 13) return setMessage("Telefon noto‘g‘ri");
+    if (!phone.trim() || phone.length < 13) {
+      return setMessage("Telefon noto‘g‘ri");
+    }
     if (!address.trim()) return setMessage("Manzil kiriting");
-    if (!receipt) return setMessage("Chek yuklang");
     if (!orderData.productId) return setMessage("Mahsulot topilmadi");
     if (orderData.productId === "cart" && items.length === 0) {
       return setMessage("Savatcha bo‘sh");
     }
 
+    if (paymentMethod === "card_transfer" && !receipt) {
+      return setMessage("Karta to‘lovi uchun chek yuklang");
+    }
+
     setSubmitting(true);
 
     try {
-      const ext = receipt.name.split(".").pop();
-      const fileName = `receipt-${Date.now()}.${ext}`;
+      let receiptUrl = null;
 
-      const { error: uploadError } = await supabase.storage
-        .from("payment-receipts")
-        .upload(fileName, receipt);
+      if (paymentMethod === "card_transfer" && receipt) {
+        const ext = receipt.name.split(".").pop();
+        const fileName = `receipt-${Date.now()}.${ext}`;
 
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from("payment-receipts")
+          .upload(fileName, receipt);
 
-      const { data: urlData } = supabase.storage
-        .from("payment-receipts")
-        .getPublicUrl(fileName);
+        if (uploadError) throw uploadError;
 
-      const receiptUrl = urlData.publicUrl;
+        const { data: urlData } = supabase.storage
+          .from("payment-receipts")
+          .getPublicUrl(fileName);
+
+        receiptUrl = urlData.publicUrl;
+      }
 
       const { data: addressData, error: addressError } = await supabase
         .from("addresses")
@@ -197,8 +208,11 @@ export default function CheckoutPage() {
             address_id: addressData.id,
             total_amount: orderTotal,
             status: "new",
-            payment_status: "pending_review",
-            payment_method: "card_transfer",
+            payment_status:
+              paymentMethod === "cash_on_delivery"
+                ? "cash_pending"
+                : "pending_review",
+            payment_method: paymentMethod,
             receipt_url: receiptUrl,
             notes:
               orderData.productId === "cart"
@@ -238,8 +252,9 @@ export default function CheckoutPage() {
           productPrice: orderTotal,
           selectedSize: selectedSizeForBot,
           deliveryText: deliveryTextForBot,
-          receiptUrl,
+          receiptUrl: receiptUrl || "",
           mapUrl: mapData?.mapUrl || "",
+          paymentMethod,
         }),
       });
 
@@ -261,6 +276,7 @@ export default function CheckoutPage() {
       setReceipt(null);
       setAddress("");
       setMapData(null);
+      setPaymentMethod("card_transfer");
     } catch (error) {
       console.error(error);
       setMessage(`Xatolik: ${error.message}`);
@@ -379,54 +395,108 @@ export default function CheckoutPage() {
 
         <div className="card card-dark p-4">
           <div className="mb-4 flex items-center gap-2">
-            <CreditCard size={18} className="text-violet-600" />
-            <h2 className="text-lg font-bold">To'lov ma'lumoti</h2>
+            <Wallet size={18} className="text-violet-600" />
+            <h2 className="text-lg font-bold">To‘lov usuli</h2>
           </div>
 
-          <div className="rounded-3xl bg-violet-600 p-4 text-white">
-            {loadingSettings ? (
-              <div className="flex items-center gap-2 text-sm">
-                <Loader2 size={16} className="animate-spin" />
-                Yuklanmoqda...
+          <div className="grid gap-3">
+            <button
+              type="button"
+              onClick={() => setPaymentMethod("card_transfer")}
+              className={`rounded-2xl border px-4 py-4 text-left transition ${
+                paymentMethod === "card_transfer"
+                  ? "border-violet-600 bg-violet-600 text-white"
+                  : "border-gray-200 bg-gray-50 dark:border-neutral-700 dark:bg-neutral-800"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <CreditCard size={18} />
+                <span className="font-semibold">Karta orqali to‘lov</span>
               </div>
-            ) : settings ? (
-              <>
-                <p className="text-sm text-violet-100">Karta raqami</p>
-                <p className="mt-1 text-xl font-bold tracking-wider">
-                  {settings.card_number || "Karta topilmadi"}
-                </p>
+              <p className="mt-1 text-sm opacity-80">
+                To‘lov qilasiz va chek yuklaysiz
+              </p>
+            </button>
 
-                <p className="mt-3 text-sm text-violet-100">Karta egasi</p>
-                <p className="font-semibold">
-                  {settings.card_holder_name || "Noma'lum"}
-                </p>
-
-                {settings.phone_primary ? (
-                  <>
-                    <p className="mt-3 text-sm text-violet-100">Aloqa</p>
-                    <p className="font-semibold">{settings.phone_primary}</p>
-                  </>
-                ) : null}
-              </>
-            ) : (
-              <div className="text-sm">Settings jadvalida karta ma'lumoti yo‘q</div>
-            )}
+            <button
+              type="button"
+              onClick={() => setPaymentMethod("cash_on_delivery")}
+              className={`rounded-2xl border px-4 py-4 text-left transition ${
+                paymentMethod === "cash_on_delivery"
+                  ? "border-violet-600 bg-violet-600 text-white"
+                  : "border-gray-200 bg-gray-50 dark:border-neutral-700 dark:bg-neutral-800"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Wallet size={18} />
+                <span className="font-semibold">Naqd to‘lov</span>
+              </div>
+              <p className="mt-1 text-sm opacity-80">
+                Mahsulot kelganda qo‘lga to‘laysiz
+              </p>
+            </button>
           </div>
-
-          <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-gray-300 p-6 text-center dark:border-neutral-700">
-            <Upload size={22} className="mb-2 text-violet-600" />
-            <span className="font-medium">
-              {receipt ? receipt.name : "Chek rasmini tanlang"}
-            </span>
-            <span className="mt-1 text-sm text-gray-500">JPG, PNG yoki PDF</span>
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              onChange={handleReceiptChange}
-              className="hidden"
-            />
-          </label>
         </div>
+
+        {paymentMethod === "card_transfer" ? (
+          <div className="card card-dark p-4">
+            <div className="mb-4 flex items-center gap-2">
+              <CreditCard size={18} className="text-violet-600" />
+              <h2 className="text-lg font-bold">Karta ma'lumoti</h2>
+            </div>
+
+            <div className="rounded-3xl bg-violet-600 p-4 text-white">
+              {loadingSettings ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <Loader2 size={16} className="animate-spin" />
+                  Yuklanmoqda...
+                </div>
+              ) : settings ? (
+                <>
+                  <p className="text-sm text-violet-100">Karta raqami</p>
+                  <p className="mt-1 text-xl font-bold tracking-wider">
+                    {settings.card_number || "Karta topilmadi"}
+                  </p>
+
+                  <p className="mt-3 text-sm text-violet-100">Karta egasi</p>
+                  <p className="font-semibold">
+                    {settings.card_holder_name || "Noma'lum"}
+                  </p>
+
+                  {settings.phone_primary ? (
+                    <>
+                      <p className="mt-3 text-sm text-violet-100">Aloqa</p>
+                      <p className="font-semibold">{settings.phone_primary}</p>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <div className="text-sm">Settings jadvalida karta ma'lumoti yo‘q</div>
+              )}
+            </div>
+
+            <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-gray-300 p-6 text-center dark:border-neutral-700">
+              <Upload size={22} className="mb-2 text-violet-600" />
+              <span className="font-medium">
+                {receipt ? receipt.name : "Chek rasmini tanlang"}
+              </span>
+              <span className="mt-1 text-sm text-gray-500">JPG, PNG yoki PDF</span>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={handleReceiptChange}
+                className="hidden"
+              />
+            </label>
+          </div>
+        ) : (
+          <div className="card card-dark p-4">
+            <div className="rounded-2xl bg-gray-50 p-4 text-sm dark:bg-neutral-800/70">
+              Naqd to‘lov tanlandi. Mahsulot kelganda to‘lovni qo‘lda qilasiz.
+              Chek yuklash shart emas.
+            </div>
+          </div>
+        )}
 
         <div className="card card-dark p-4">
           <div className="flex justify-between text-sm">

@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Package,
-  Phone,
-  MapPin,
-  Image,
-  Send,
-  Eye,
-} from "lucide-react";
+import { Package, Phone, MapPin, Image, Send, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
@@ -17,6 +10,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [forms, setForms] = useState({});
+  const [sendingId, setSendingId] = useState("");
 
   useEffect(() => {
     fetchOrders();
@@ -83,50 +77,59 @@ export default function AdminOrdersPage() {
       return;
     }
 
-    const payload = {
-      status: form.status,
-      cargo_weight_kg:
-        form.cargoWeightKg === "" ? null : Number(form.cargoWeightKg),
-      cargo_amount:
-        form.cargoAmount === "" ? null : Number(form.cargoAmount),
-      admin_note: form.adminNote || null,
-    };
+    setSendingId(order.id);
 
-    const { error: updateError } = await supabase
-      .from("orders")
-      .update(payload)
-      .eq("id", order.id);
-
-    if (updateError) {
-      alert("Order update bo‘lmadi");
-      console.error(updateError);
-      return;
-    }
-
-    const res = await fetch(`${API_URL}/send-status`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chatId,
+    try {
+      const payload = {
         status: form.status,
-        cargoWeightKg: form.cargoWeightKg,
-        cargoAmount: form.cargoAmount,
-        adminNote: form.adminNote,
-      }),
-    });
+        cargo_weight_kg:
+          form.status === "in_cargo" && form.cargoWeightKg !== ""
+            ? Number(form.cargoWeightKg)
+            : null,
+        cargo_amount:
+          form.status === "in_cargo" && form.cargoAmount !== ""
+            ? Number(form.cargoAmount)
+            : null,
+        admin_note: form.adminNote || null,
+      };
 
-    const result = await res.json();
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update(payload)
+        .eq("id", order.id);
 
-    if (!result.success) {
-      alert("Telegramga yuborishda xatolik");
-      console.error(result);
-      return;
+      if (updateError) throw updateError;
+
+      const response = await fetch(`${API_URL}/send-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chatId,
+          status: form.status,
+          cargoWeightKg:
+            form.status === "in_cargo" ? form.cargoWeightKg : null,
+          cargoAmount:
+            form.status === "in_cargo" ? form.cargoAmount : null,
+          adminNote: form.adminNote,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || "Telegramga yuborilmadi");
+      }
+
+      alert("Mijozga yuborildi ✅");
+      fetchOrders();
+    } catch (error) {
+      console.error(error);
+      alert(`Xatolik: ${error.message}`);
+    } finally {
+      setSendingId("");
     }
-
-    alert("Status mijozga yuborildi ✅");
-    fetchOrders();
   }
 
   if (loading) {
@@ -140,15 +143,16 @@ export default function AdminOrdersPage() {
   return (
     <MobileLayout title="Buyurtmalar">
       <div className="space-y-4 pb-24">
-        {orders.length === 0 && (
+        {orders.length === 0 ? (
           <div className="card card-dark p-6 text-center text-sm text-gray-500">
             Hozircha buyurtmalar yo‘q
           </div>
-        )}
+        ) : null}
 
         {orders.map((order) => {
           const address = order.addresses;
           const form = forms[order.id] || {};
+          const isCargo = form.status === "in_cargo";
 
           return (
             <div key={order.id} className="card card-dark space-y-4 p-4">
@@ -159,7 +163,7 @@ export default function AdminOrdersPage() {
                 </span>
               </div>
 
-              <div className="space-y-1 text-sm">
+              <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">
                   <Package size={14} />
                   <span>{order.notes || "Buyurtma"}</span>
@@ -179,11 +183,11 @@ export default function AdminOrdersPage() {
               <div className="flex justify-between text-sm">
                 <span>Jami:</span>
                 <span className="font-bold text-violet-600">
-                  {Number(order.total_amount).toLocaleString()} so'm
+                  {Number(order.total_amount || 0).toLocaleString()} so'm
                 </span>
               </div>
 
-              {order.receipt_url && (
+              {order.receipt_url ? (
                 <a
                   href={order.receipt_url}
                   target="_blank"
@@ -193,7 +197,7 @@ export default function AdminOrdersPage() {
                   <Image size={16} />
                   Chekni ko‘rish
                 </a>
-              )}
+              ) : null}
 
               <Link
                 to={`/admin/orders/${order.id}`}
@@ -218,27 +222,29 @@ export default function AdminOrdersPage() {
                   <option value="cancelled">Bekor qilindi</option>
                 </select>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="number"
-                    value={form.cargoWeightKg || ""}
-                    onChange={(e) =>
-                      updateForm(order.id, "cargoWeightKg", e.target.value)
-                    }
-                    className="input"
-                    placeholder="Cargo kg"
-                  />
+                {isCargo ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="number"
+                      value={form.cargoWeightKg || ""}
+                      onChange={(e) =>
+                        updateForm(order.id, "cargoWeightKg", e.target.value)
+                      }
+                      className="input"
+                      placeholder="Cargo kg"
+                    />
 
-                  <input
-                    type="number"
-                    value={form.cargoAmount || ""}
-                    onChange={(e) =>
-                      updateForm(order.id, "cargoAmount", e.target.value)
-                    }
-                    className="input"
-                    placeholder="Cargo narxi"
-                  />
-                </div>
+                    <input
+                      type="number"
+                      value={form.cargoAmount || ""}
+                      onChange={(e) =>
+                        updateForm(order.id, "cargoAmount", e.target.value)
+                      }
+                      className="input"
+                      placeholder="Cargo narxi"
+                    />
+                  </div>
+                ) : null}
 
                 <textarea
                   value={form.adminNote || ""}
@@ -246,15 +252,24 @@ export default function AdminOrdersPage() {
                     updateForm(order.id, "adminNote", e.target.value)
                   }
                   className="input min-h-[90px] resize-none"
-                  placeholder="Izoh yoki sabab yozing"
+                  placeholder={
+                    isCargo
+                      ? "Cargo bo‘yicha izoh"
+                      : form.status === "cancelled"
+                      ? "Bekor qilish sababi"
+                      : "Qo‘shimcha izoh"
+                  }
                 />
 
                 <button
                   onClick={() => handleSendStatus(order)}
-                  className="btn-primary flex w-full items-center justify-center gap-2"
+                  disabled={sendingId === order.id}
+                  className="btn-primary flex w-full items-center justify-center gap-2 py-3 disabled:opacity-60"
                 >
                   <Send size={16} />
-                  Mijozga yuborish
+                  {sendingId === order.id
+                    ? "Yuborilmoqda..."
+                    : "Mijozga yuborish"}
                 </button>
               </div>
             </div>

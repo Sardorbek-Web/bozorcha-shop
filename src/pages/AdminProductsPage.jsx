@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Trash2, Pencil, Plus } from "lucide-react";
+import { Trash2, Pencil, Plus, Package2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
+  const [imagesMap, setImagesMap] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,6 +23,23 @@ export default function AdminProductsPage() {
 
     if (!error && data) {
       setProducts(data);
+
+      const ids = data.map((item) => item.id);
+      if (ids.length > 0) {
+        const { data: images } = await supabase
+          .from("product_images")
+          .select("product_id, image_url, sort_order")
+          .in("product_id", ids)
+          .order("sort_order", { ascending: true });
+
+        const map = {};
+        (images || []).forEach((img) => {
+          if (!map[img.product_id]) {
+            map[img.product_id] = img.image_url;
+          }
+        });
+        setImagesMap(map);
+      }
     } else {
       console.error(error);
     }
@@ -30,19 +48,18 @@ export default function AdminProductsPage() {
   }
 
   async function deleteProduct(id) {
-    const confirmDelete = window.confirm("Rostdan o‘chirmoqchimisiz?");
-    if (!confirmDelete) return;
+    const ok = window.confirm("Rostdan o‘chirmoqchimisiz?");
+    if (!ok) return;
 
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("products").delete().eq("id", id);
 
-    if (!error) {
-      fetchProducts();
-    } else {
-      alert("Xatolik yuz berdi");
+    if (error) {
+      console.error(error);
+      alert("O‘chirishda xatolik");
+      return;
     }
+
+    fetchProducts();
   }
 
   return (
@@ -50,7 +67,7 @@ export default function AdminProductsPage() {
       <div className="space-y-4 pb-24">
         <Link
           to="/admin/products/new"
-          className="flex items-center justify-center gap-2 rounded-2xl bg-violet-600 py-3 font-semibold text-white"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-violet-600 py-3 font-semibold text-white shadow-lg"
         >
           <Plus size={18} />
           Yangi mahsulot qo‘shish
@@ -68,37 +85,57 @@ export default function AdminProductsPage() {
 
         {!loading &&
           products.map((product) => (
-            <div key={product.id} className="card card-dark p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-bold">{product.name_uz}</p>
-                  <p className="text-sm text-gray-500">
+            <div
+              key={product.id}
+              className="card card-dark overflow-hidden p-0"
+            >
+              <div className="flex gap-3 p-3">
+                <div className="h-24 w-24 overflow-hidden rounded-2xl bg-gray-100 dark:bg-neutral-800">
+                  {imagesMap[product.id] ? (
+                    <img
+                      src={imagesMap[product.id]}
+                      alt={product.name_uz}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-gray-400">
+                      <Package2 size={24} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1">
+                  <p className="line-clamp-2 font-bold">{product.name_uz}</p>
+                  <p className="mt-1 text-sm text-violet-600 font-semibold">
                     {Number(product.price).toLocaleString()} so'm
                   </p>
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500">
+                    Stock: {product.stock || 0}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
                     {product.supply_type === "preorder"
                       ? "Xitoydan buyurtma"
                       : "Tayyor mahsulot"}
                   </p>
                 </div>
+              </div>
 
-                <div className="flex gap-2">
-                  <Link
-                    to={`/admin/products/edit/${product.id}`}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-neutral-800"
-                    title="Tahrirlash"
-                  >
-                    <Pencil size={16} />
-                  </Link>
+              <div className="grid grid-cols-2 gap-2 border-t border-gray-100 p-3 dark:border-neutral-800">
+                <Link
+                  to={`/admin/products/edit/${product.id}`}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-gray-100 py-3 font-medium dark:bg-neutral-800"
+                >
+                  <Pencil size={16} />
+                  Tahrirlash
+                </Link>
 
-                  <button
-                    onClick={() => deleteProduct(product.id)}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500 text-white"
-                    title="O‘chirish"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                <button
+                  onClick={() => deleteProduct(product.id)}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 font-medium text-white"
+                >
+                  <Trash2 size={16} />
+                  O‘chirish
+                </button>
               </div>
             </div>
           ))}

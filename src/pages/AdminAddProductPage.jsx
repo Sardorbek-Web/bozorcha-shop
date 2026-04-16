@@ -163,6 +163,7 @@ export default function AdminAddProductPage() {
             stock: Number(form.stock || 0),
             description_uz: form.description_uz || "",
             description_ru: form.description_ru || form.description_uz || "",
+            sizes: form.sizes || "",
             is_active: form.is_active,
           },
         ])

@@ -1,58 +1,148 @@
-import { useEffect, useState } from "react";
-import {
-  Heart,
-  ShieldCheck,
-  Truck,
-  Clock3,
-  MessageCircleMore,
-} from "lucide-react";
-import { useParams, Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Heart, ShoppingCart, Package2, Truck, ShieldCheck } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
+import { useCartStore } from "../store/useCartStore";
+import { useFavoritesStore } from "../store/useFavoritesStore";
+
+function resolveImageUrl(imagePathOrUrl) {
+  if (!imagePathOrUrl) return "";
+  if (
+    imagePathOrUrl.startsWith("http://") ||
+    imagePathOrUrl.startsWith("https://")
+  ) {
+    return imagePathOrUrl;
+  }
+
+  const { data } = supabase.storage
+    .from("product-images")
+    .getPublicUrl(imagePathOrUrl);
+
+  return data?.publicUrl || "";
+}
+
+function parseSizes(raw) {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 export default function ProductPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+
+  const addToCart = useCartStore((state) => state.addToCart);
+  const favorites = useFavoritesStore((state) => state.favorites || []);
+  const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
+
   const [product, setProduct] = useState(null);
-  const [sizes, setSizes] = useState([]);
+  const [images, setImages] = useState([]);
+  const [activeImage, setActiveImage] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     fetchProduct();
   }, [id]);
 
   async function fetchProduct() {
-    const { data, error } = await supabase
-      .from("products")
-      .select(`
-        *,
-        product_images (
-          image_url
-        ),
-        product_variants (
-          id,
-          type,
-          value,
-          stock
-        )
-      `)
-      .eq("id", id)
-      .single();
+    setLoading(true);
+    setMessage("");
 
-    if (!error && data) {
-      setProduct(data);
+    try {
+      const { data: productData, error: productError } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .single();
 
-      const sizeVariants =
-        data.product_variants?.filter((item) => item.type === "size") || [];
+      if (productError) throw productError;
 
-      setSizes(sizeVariants);
+      setProduct(productData);
 
-      if (sizeVariants.length > 0) {
-        setSelectedSize(sizeVariants[0].value);
-      }
+      const { data: imageRows, error: imageError } = await supabase
+        .from("product_images")
+        .select("*")
+        .eq("product_id", id)
+        .order("sort_order", { ascending: true });
+
+      if (imageError) throw imageError;
+
+      const resolvedImages = (imageRows || [])
+        .map((row) => resolveImageUrl(row.image_url))
+        .filter(Boolean);
+
+      setImages(resolvedImages);
+      setActiveImage(resolvedImages[0] || "");
+    } catch (error) {
+      console.error("ProductPage xato:", error);
+      setMessage("Mahsulotni yuklashda xatolik bo‘ldi");
+    } finally {
+      setLoading(false);
     }
   }
 
-  if (!product) {
+  const sizes = useMemo(() => parseSizes(product?.sizes), [product?.sizes]);
+
+  const isFavorite = Array.isArray(favorites)
+    ? favorites.some((item) => item?.id === product?.id)
+    : false;
+
+  function handleToggleFavorite() {
+    if (!product?.id) return;
+
+    toggleFavorite({
+      id: product.id,
+      name: product.name_uz || product.name_ru || "Mahsulot",
+      price: Number(product.price || 0),
+      image: activeImage || images[0] || "",
+    });
+  }
+
+  function handleAddToCart() {
+    if (!product?.id) return;
+
+    if (sizes.length > 0 && !selectedSize) {
+      setMessage("Iltimos, razmer tanlang");
+      return;
+    }
+
+    addToCart({
+      id: product.id,
+      name: product.name_uz || product.name_ru || "Mahsulot",
+      price: Number(product.price || 0),
+      image: activeImage || images[0] || "",
+      selectedSize: selectedSize || null,
+      quantity: 1,
+    });
+
+    setMessage("Savatchaga qo‘shildi ✅");
+  }
+
+  function handleBuyNow() {
+    if (!product?.id) return;
+
+    if (sizes.length > 0 && !selectedSize) {
+      setMessage("Iltimos, razmer tanlang");
+      return;
+    }
+
+    navigate("/checkout", {
+      state: {
+        productId: product.id,
+        productName: product.name_uz || product.name_ru || "Mahsulot",
+        productPrice: Number(product.price || 0),
+        selectedSize: selectedSize || "",
+        deliveryText: "10–15 kun",
+      },
+    });
+  }
+
+  if (loading) {
     return (
       <MobileLayout title="Mahsulot">
         <div className="card card-dark p-6">Yuklanmoqda...</div>
@@ -60,158 +150,155 @@ export default function ProductPage() {
     );
   }
 
-  const imageUrl =
-    product.product_images?.[0]?.image_url || "https://placehold.co/600x600";
-
-  const deliveryText =
-    product.supply_type === "ready"
-      ? `${product.delivery_days_min || 1}-${
-          product.delivery_days_max || 3
-        } kun`
-      : `${product.delivery_days_min || 10}-${
-          product.delivery_days_max || 12
-        } kun`;
+  if (!product) {
+    return (
+      <MobileLayout title="Mahsulot">
+        <div className="card card-dark p-6">Mahsulot topilmadi</div>
+      </MobileLayout>
+    );
+  }
 
   return (
     <MobileLayout title="Mahsulot">
       <div className="space-y-4 pb-24">
-        <div className="overflow-hidden rounded-[32px] border border-white/60 bg-white shadow-soft dark:border-neutral-800 dark:bg-neutral-900">
-          <img
-            src={imageUrl}
-            alt={product.name_uz}
-            className="w-full object-cover"
-          />
+        <div className="card card-dark overflow-hidden p-0">
+          <div className="relative aspect-square bg-gray-100 dark:bg-neutral-900">
+            {activeImage ? (
+              <img
+                src={activeImage}
+                alt={product.name_uz || "Mahsulot"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-gray-400">
+                <Package2 size={56} />
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleToggleFavorite}
+              className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow dark:bg-neutral-900/90"
+            >
+              <Heart
+                size={18}
+                className={isFavorite ? "fill-red-500 text-red-500" : ""}
+              />
+            </button>
+          </div>
+
+          {images.length > 1 ? (
+            <div className="flex gap-2 overflow-x-auto p-3">
+              {images.map((img, index) => (
+                <button
+                  key={`${img}-${index}`}
+                  type="button"
+                  onClick={() => setActiveImage(img)}
+                  className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-2xl border ${
+                    activeImage === img
+                      ? "border-violet-600"
+                      : "border-gray-200 dark:border-neutral-800"
+                  }`}
+                >
+                  <img src={img} alt="preview" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="card card-dark p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-lg font-bold leading-tight">
-                {product.name_uz}
-              </p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {product.supply_type === "preorder"
-                  ? "Xitoydan buyurtma qilinadi"
-                  : "Tayyor mahsulot"}
-              </p>
+              <h1 className="text-xl font-bold">
+                {product.name_uz || product.name_ru || "Mahsulot"}
+              </h1>
+              {product.category ? (
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {product.category}
+                </p>
+              ) : null}
             </div>
 
-            <button className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gray-100 dark:bg-neutral-800">
-              <Heart size={18} />
-            </button>
-          </div>
-
-          <div className="mt-4">
-            {product.old_price && (
-              <p className="text-sm text-gray-400 line-through">
-                {Number(product.old_price).toLocaleString()} so'm
+            <div className="text-right">
+              {product.old_price ? (
+                <p className="text-sm text-gray-400 line-through">
+                  {Number(product.old_price).toLocaleString()} so'm
+                </p>
+              ) : null}
+              <p className="text-xl font-bold text-violet-600">
+                {Number(product.price || 0).toLocaleString()} so'm
               </p>
-            )}
-            <div className="flex items-center gap-2">
-              <p className="text-2xl font-bold text-violet-600">
-                {Number(product.price).toLocaleString()} so'm
-              </p>
-              {product.old_price && (
-                <span className="badge-sale">
-                  -
-                  {Math.round(
-                    ((Number(product.old_price) - Number(product.price)) /
-                      Number(product.old_price)) *
-                      100
-                  )}
-                  %
-                </span>
-              )}
             </div>
           </div>
 
-          <p className="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
-            {product.description_uz || "Mahsulot tavsifi kiritilmagan."}
-          </p>
-
-          {sizes.length > 0 && (
+          {sizes.length > 0 ? (
             <div className="mt-5">
-              <p className="mb-2 font-semibold">O'lcham tanlang</p>
+              <h2 className="mb-3 text-sm font-semibold">Razmer tanlang</h2>
               <div className="flex flex-wrap gap-2">
-                {sizes.map((size) => {
-                  const active = selectedSize === size.value;
-
-                  return (
-                    <button
-                      key={size.id}
-                      onClick={() => setSelectedSize(size.value)}
-                      className={`rounded-2xl px-4 py-2.5 text-sm font-medium transition ${
-                        active
-                          ? "bg-violet-600 text-white"
-                          : "border border-gray-200 bg-white text-gray-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white"
-                      }`}
-                    >
-                      {size.value}
-                    </button>
-                  );
-                })}
+                {sizes.map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSize(size);
+                      setMessage("");
+                    }}
+                    className={`rounded-2xl border px-4 py-2 text-sm font-medium transition ${
+                      selectedSize === size
+                        ? "border-violet-600 bg-violet-600 text-white"
+                        : "border-gray-200 bg-gray-50 dark:border-neutral-800 dark:bg-neutral-900"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
+          ) : null}
 
-          <div className="mt-5 grid gap-2">
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <Clock3 size={18} className="text-violet-600" />
-              <span className="text-sm">
-                Yetkazib berish: {deliveryText}
-              </span>
+          <div className="mt-5 space-y-3 text-sm">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+              <Truck size={16} />
+              <span>Xitoydan buyurtma • 10–15 kunda yetib keladi</span>
             </div>
-
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <Truck size={18} className="text-violet-600" />
-              <span className="text-sm">
-                Cargo summasi keyinchalik alohida bildiriladi
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <ShieldCheck size={18} className="text-violet-600" />
-              <span className="text-sm">
-                To'lov tasdiqlangach buyurtma jarayoni boshlanadi
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 dark:bg-neutral-800/70">
-              <MessageCircleMore size={18} className="text-violet-600" />
-              <span className="text-sm">
-                Cargo narxi Telegram yoki telefon orqali aytiladi
-              </span>
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+              <ShieldCheck size={16} />
+              <span>Ishonchli buyurtma va admin kuzatuvi</span>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="fixed bottom-24 left-0 right-0 z-30">
-        <div className="container-mobile px-4">
-          <div className="flex items-center justify-between rounded-[26px] border border-white/70 bg-white/95 p-3 shadow-soft backdrop-blur-xl dark:border-neutral-800 dark:bg-neutral-900/95">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Narxi
-              </p>
-              <p className="text-lg font-bold text-violet-600">
-                {Number(product.price).toLocaleString()} so'm
-              </p>
-            </div>
+        <div className="card card-dark p-4">
+          <h2 className="mb-3 text-lg font-bold">Tavsif</h2>
+          <p className="whitespace-pre-line text-sm text-gray-600 dark:text-gray-300">
+            {product.description_uz ||
+              product.description_ru ||
+              "Tavsif mavjud emas"}
+          </p>
+        </div>
 
-            <Link
-              to="/checkout"
-              state={{
-                productId: product.id,
-                productName: product.name_uz,
-                productPrice: Number(product.price),
-                selectedSize,
-                deliveryText,
-              }}
-              className="btn-primary px-5"
-            >
-              Buyurtma berish
-            </Link>
-          </div>
+        {message ? (
+          <div className="card card-dark p-4 text-sm">{message}</div>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-gray-100 py-4 font-semibold dark:bg-neutral-800"
+          >
+            <ShoppingCart size={18} />
+            Savatchaga
+          </button>
+
+          <button
+            type="button"
+            onClick={handleBuyNow}
+            className="rounded-2xl bg-violet-600 py-4 font-semibold text-white"
+          >
+            Buyurtma berish
+          </button>
         </div>
       </div>
     </MobileLayout>

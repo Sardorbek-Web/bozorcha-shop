@@ -60,9 +60,11 @@ export default async function handler(req, res) {
       `${category ? `🗂 Kategoriya: <b>${category}</b>\n` : ""}` +
       `💰 Narxi: <b>${priceText} so'm</b>\n` +
       `${oldPriceText ? `🏷 Eski narx: <s>${oldPriceText} so'm</s>\n` : ""}` +
-      `📏 Razmer: ${sizes || "-"}\n\n` +
+      `📏 Razmerlar: ${sizes || "-"}\n` +
+      `🚚 Yetkazib berish: <b>10–15 kun</b>\n` +
+      `🌏 Buyurtma: <b>Xitoydan</b>\n\n` +
       `📝 <b>Tavsif:</b>\n${description || "-"}\n\n` +
-      `📞 Aloqa: @berkinov_08\n` +
+      `📞 Aloqa uchun: @berkinov_08\n` +
       `🤖 Buyurtma uchun: @Bozorcha_shop_bot`;
 
     const payload = {

@@ -1,6 +1,10 @@
 function buildStatusMessage({ status, cargoWeightKg, cargoAmount, adminNote }) {
   if (status === "confirmed") {
-    return `✅ *Buyurtmangiz tasdiqlandi*\n\nTez orada keyingi holat haqida xabar beramiz.`;
+    return (
+      `✅ *Buyurtmangiz tasdiqlandi*\n\n` +
+      `Tez orada Xitoydan buyurtma beriladi.\n` +
+      `🚚 Taxminiy yetib kelish muddati: *10–15 kun*`
+    );
   }
 
   if (status === "in_cargo") {

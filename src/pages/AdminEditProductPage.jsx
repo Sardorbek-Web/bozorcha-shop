@@ -4,16 +4,6 @@ import { ImagePlus, Loader2, Send } from "lucide-react";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
 
-const categories = [
-  "Krossovka",
-  "Kiyim",
-  "Sumka",
-  "Aksessuar",
-  "Kosmetika",
-  "Elektronika",
-  "Boshqa",
-];
-
 export default function AdminEditProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -24,6 +14,7 @@ export default function AdminEditProductPage() {
   const [message, setMessage] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [preview, setPreview] = useState("");
+  const [categories, setCategories] = useState([]);
 
   const [form, setForm] = useState({
     name_uz: "",
@@ -40,7 +31,22 @@ export default function AdminEditProductPage() {
 
   useEffect(() => {
     fetchProduct();
+    fetchCategories();
   }, []);
+
+  async function fetchCategories() {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("name_uz", { ascending: true });
+
+    if (error) {
+      console.error("categories xato:", error);
+      setCategories([]);
+    } else {
+      setCategories(data || []);
+    }
+  }
 
   async function fetchProduct() {
     setLoading(true);
@@ -281,8 +287,8 @@ export default function AdminEditProductPage() {
           >
             <option value="">Kategoriya tanlang</option>
             {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
+              <option key={cat.id} value={cat.name_uz}>
+                {cat.name_uz}
               </option>
             ))}
           </select>
@@ -373,7 +379,9 @@ export default function AdminEditProductPage() {
           </label>
         </div>
 
-        {message ? <div className="card card-dark p-4 text-sm">{message}</div> : null}
+        {message ? (
+          <div className="card card-dark p-4 text-sm">{message}</div>
+        ) : null}
 
         <button
           type="submit"

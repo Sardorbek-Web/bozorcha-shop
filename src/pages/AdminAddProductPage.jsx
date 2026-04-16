@@ -1,18 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ImagePlus, Loader2, Send } from "lucide-react";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
-
-const categories = [
-  "Krossovka",
-  "Kiyim",
-  "Sumka",
-  "Aksessuar",
-  "Kosmetika",
-  "Elektronika",
-  "Boshqa",
-];
 
 export default function AdminAddProductPage() {
   const navigate = useNavigate();
@@ -22,6 +12,7 @@ export default function AdminAddProductPage() {
   const [message, setMessage] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [preview, setPreview] = useState("");
+  const [categories, setCategories] = useState([]);
 
   const [form, setForm] = useState({
     name_uz: "",
@@ -35,6 +26,24 @@ export default function AdminAddProductPage() {
     sizes: "",
     is_active: true,
   });
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  async function fetchCategories() {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("name_uz", { ascending: true });
+
+    if (error) {
+      console.error("categories xato:", error);
+      setCategories([]);
+    } else {
+      setCategories(data || []);
+    }
+  }
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
@@ -232,8 +241,8 @@ export default function AdminAddProductPage() {
           >
             <option value="">Kategoriya tanlang</option>
             {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
+              <option key={cat.id} value={cat.name_uz}>
+                {cat.name_uz}
               </option>
             ))}
           </select>
@@ -324,7 +333,9 @@ export default function AdminAddProductPage() {
           </label>
         </div>
 
-        {message ? <div className="card card-dark p-4 text-sm">{message}</div> : null}
+        {message ? (
+          <div className="card card-dark p-4 text-sm">{message}</div>
+        ) : null}
 
         <button
           type="submit"

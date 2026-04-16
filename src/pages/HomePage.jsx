@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import MobileLayout from "../components/layout/MobileLayout";
 import ProductCard from "../components/ui/ProductCard";
 import { supabase } from "../lib/supabase";
 
 function resolveImageUrl(imagePathOrUrl) {
   if (!imagePathOrUrl) return "";
-  if (imagePathOrUrl.startsWith("http://") || imagePathOrUrl.startsWith("https://")) {
+  if (
+    imagePathOrUrl.startsWith("http://") ||
+    imagePathOrUrl.startsWith("https://")
+  ) {
     return imagePathOrUrl;
   }
 
@@ -19,11 +22,28 @@ function resolveImageUrl(imagePathOrUrl) {
 export default function HomePage() {
   const [products, setProducts] = useState([]);
   const [imagesMap, setImagesMap] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("Barchasi");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
+
+  async function fetchCategories() {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("name_uz", { ascending: true });
+
+    if (error) {
+      console.error("categories xato:", error);
+      setCategories([]);
+    } else {
+      setCategories(data || []);
+    }
+  }
 
   async function fetchProducts() {
     setLoading(true);
@@ -57,6 +77,7 @@ export default function HomePage() {
             map[img.product_id] = resolveImageUrl(img.image_url);
           }
         });
+
         setImagesMap(map);
       } else {
         setImagesMap({});
@@ -70,7 +91,12 @@ export default function HomePage() {
     }
   }
 
-  const uiProducts = products.map((product) => ({
+  const filteredProducts = useMemo(() => {
+    if (selectedCategory === "Barchasi") return products;
+    return products.filter((item) => item?.category === selectedCategory);
+  }, [products, selectedCategory]);
+
+  const uiProducts = filteredProducts.map((product) => ({
     id: product?.id,
     name: product?.name_uz || product?.name_ru || "Mahsulot",
     price: Number(product?.price || 0),
@@ -78,33 +104,93 @@ export default function HomePage() {
     image: imagesMap[product.id] || "",
   }));
 
+  const newProducts = uiProducts.slice(0, 6);
+
   return (
     <MobileLayout title="Bozorcha">
       <div className="space-y-4 pb-24">
         <section className="overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-600 via-fuchsia-500 to-indigo-500 p-5 text-white shadow-xl">
           <p className="text-sm text-violet-100">Bozorcha</p>
-          <h1 className="mt-1 text-2xl font-bold">Yangi mahsulotlar</h1>
+          <h1 className="mt-1 text-2xl font-bold">Telegram ichida zamonaviy do‘kon</h1>
           <p className="mt-2 text-sm text-violet-100">
             Eng sara mahsulotlarni qulay narxlarda tanlang
           </p>
+
+          <div className="mt-4 flex gap-2">
+            <div className="rounded-2xl bg-white/15 px-3 py-2 text-sm">
+              Tez buyurtma
+            </div>
+            <div className="rounded-2xl bg-white/15 px-3 py-2 text-sm">
+              Ishonchli savdo
+            </div>
+          </div>
         </section>
 
         <section className="card card-dark p-4">
-          <h2 className="text-xl font-bold">Aksiya</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold">Kategoriyalar</h2>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {categories.length} ta
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <div className="flex gap-2 pb-1">
+              <button
+                onClick={() => setSelectedCategory("Barchasi")}
+                className={`whitespace-nowrap rounded-2xl px-4 py-2 text-sm ${
+                  selectedCategory === "Barchasi"
+                    ? "bg-violet-600 text-white"
+                    : "bg-gray-100 dark:bg-neutral-800"
+                }`}
+              >
+                Barchasi
+              </button>
+
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.name_uz)}
+                  className={`whitespace-nowrap rounded-2xl px-4 py-2 text-sm ${
+                    selectedCategory === cat.name_uz
+                      ? "bg-violet-600 text-white"
+                      : "bg-gray-100 dark:bg-neutral-800"
+                  }`}
+                >
+                  {cat.name_uz}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="card card-dark p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold">
+              {selectedCategory === "Barchasi"
+                ? "Yangi mahsulotlar"
+                : selectedCategory}
+            </h2>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {uiProducts.length} ta
+            </span>
+          </div>
 
           {loading ? (
-            <div className="mt-4 rounded-2xl bg-gray-50 p-6 text-sm dark:bg-neutral-800">
+            <div className="rounded-2xl bg-gray-50 p-6 text-sm dark:bg-neutral-800">
               Yuklanmoqda...
             </div>
           ) : uiProducts.length === 0 ? (
-            <div className="mt-4 rounded-2xl bg-gray-50 p-6 text-sm dark:bg-neutral-800">
+            <div className="rounded-2xl bg-gray-50 p-6 text-sm dark:bg-neutral-800">
               Hozircha mahsulotlar yo‘q
             </div>
           ) : (
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {uiProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
+            <div className="grid grid-cols-2 gap-3">
+              {(selectedCategory === "Barchasi" ? newProducts : uiProducts).map(
+                (product) => (
+                  <ProductCard key={product.id} product={product} />
+                )
+              )}
             </div>
           )}
         </section>

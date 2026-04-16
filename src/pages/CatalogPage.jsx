@@ -5,7 +5,10 @@ import { supabase } from "../lib/supabase";
 
 function resolveImageUrl(imagePathOrUrl) {
   if (!imagePathOrUrl) return "";
-  if (imagePathOrUrl.startsWith("http://") || imagePathOrUrl.startsWith("https://")) {
+  if (
+    imagePathOrUrl.startsWith("http://") ||
+    imagePathOrUrl.startsWith("https://")
+  ) {
     return imagePathOrUrl;
   }
 
@@ -19,12 +22,29 @@ function resolveImageUrl(imagePathOrUrl) {
 export default function CatalogPage() {
   const [products, setProducts] = useState([]);
   const [imagesMap, setImagesMap] = useState({});
+  const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Barchasi");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
+
+  async function fetchCategories() {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("name_uz", { ascending: true });
+
+    if (error) {
+      console.error("categories xato:", error);
+      setCategories([]);
+    } else {
+      setCategories(data || []);
+    }
+  }
 
   async function fetchProducts() {
     setLoading(true);
@@ -73,13 +93,24 @@ export default function CatalogPage() {
   }
 
   const filteredProducts = useMemo(() => {
-    const query = search.toLowerCase();
+    const query = search.toLowerCase().trim();
+
     return products.filter((item) => {
-      const uz = item?.name_uz || "";
-      const ru = item?.name_ru || "";
-      return uz.toLowerCase().includes(query) || ru.toLowerCase().includes(query);
+      const nameUz = item?.name_uz || "";
+      const nameRu = item?.name_ru || "";
+      const category = item?.category || "";
+
+      const matchesSearch =
+        !query ||
+        nameUz.toLowerCase().includes(query) ||
+        nameRu.toLowerCase().includes(query);
+
+      const matchesCategory =
+        selectedCategory === "Barchasi" || category === selectedCategory;
+
+      return matchesSearch && matchesCategory;
     });
-  }, [products, search]);
+  }, [products, search, selectedCategory]);
 
   const uiProducts = filteredProducts.map((product) => ({
     id: product?.id,
@@ -99,10 +130,45 @@ export default function CatalogPage() {
           placeholder="Mahsulot qidirish"
         />
 
+        <div className="overflow-x-auto">
+          <div className="flex gap-2 pb-1">
+            <button
+              onClick={() => setSelectedCategory("Barchasi")}
+              className={`whitespace-nowrap rounded-2xl px-4 py-2 text-sm ${
+                selectedCategory === "Barchasi"
+                  ? "bg-violet-600 text-white"
+                  : "bg-gray-100 dark:bg-neutral-800"
+              }`}
+            >
+              Barchasi
+            </button>
+
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.name_uz)}
+                className={`whitespace-nowrap rounded-2xl px-4 py-2 text-sm ${
+                  selectedCategory === cat.name_uz
+                    ? "bg-violet-600 text-white"
+                    : "bg-gray-100 dark:bg-neutral-800"
+                }`}
+              >
+                {cat.name_uz}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          Topildi: {uiProducts.length} ta mahsulot
+        </div>
+
         {loading ? (
           <div className="card card-dark p-6">Yuklanmoqda...</div>
         ) : uiProducts.length === 0 ? (
-          <div className="card card-dark p-6">Mahsulot topilmadi</div>
+          <div className="card card-dark p-6">
+            Mahsulot topilmadi
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {uiProducts.map((product) => (

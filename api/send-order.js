@@ -4,8 +4,12 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") return res.status(200).end();
+
   if (req.method !== "POST") {
-    return res.status(405).json({ success: false, message: "Method not allowed" });
+    return res.status(405).json({
+      success: false,
+      message: "Method not allowed",
+    });
   }
 
   try {
@@ -13,10 +17,17 @@ export default async function handler(req, res) {
     const CHAT_ID = process.env.CHAT_ID;
 
     if (!BOT_TOKEN) {
-      return res.status(500).json({ success: false, error: "BOT_TOKEN topilmadi" });
+      return res.status(500).json({
+        success: false,
+        error: "BOT_TOKEN topilmadi",
+      });
     }
+
     if (!CHAT_ID) {
-      return res.status(500).json({ success: false, error: "CHAT_ID topilmadi" });
+      return res.status(500).json({
+        success: false,
+        error: "CHAT_ID topilmadi",
+      });
     }
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
@@ -32,12 +43,18 @@ export default async function handler(req, res) {
       receiptUrl,
       mapUrl,
       paymentMethod,
+      paymentStatus,
     } = body || {};
 
-    const paymentText =
-      paymentMethod === "cash_on_delivery"
-        ? "💵 To'lov usuli: Naqd to'lov"
-        : "💳 To'lov usuli: Karta orqali to'lov";
+    const paymentMethodText =
+      paymentMethod === "cash" ? "Naqd to‘lov" : "Karta orqali to‘lov";
+
+    const paymentStatusText =
+      paymentStatus === "pending_review"
+        ? "Chek tekshirilmoqda"
+        : paymentStatus === "pending"
+        ? "Kutilmoqda"
+        : paymentStatus || "-";
 
     const text =
       `🛒 *Yangi buyurtma!*\n\n` +
@@ -48,14 +65,17 @@ export default async function handler(req, res) {
       `📦 Mahsulot: ${productName || "-"}\n` +
       `📏 O'lcham: ${selectedSize || "Tanlanmagan"}\n` +
       `💰 Narx: ${Number(productPrice || 0).toLocaleString()} so'm\n` +
-      `🚚 Yetkazib berish: ${deliveryText || "10-12 kun"}\n` +
-      `${paymentText}`;
+      `🚚 Yetkazib berish: ${deliveryText || "10–15 kun"}\n` +
+      `💳 To'lov usuli: ${paymentMethodText}\n` +
+      `📌 To'lov holati: ${paymentStatusText}`;
 
     const msgRes = await fetch(
       `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           chat_id: CHAT_ID,
           text,
@@ -73,7 +93,7 @@ export default async function handler(req, res) {
       });
     }
 
-    if (paymentMethod === "card_transfer" && receiptUrl) {
+    if (receiptUrl && paymentMethod !== "cash") {
       const isImage =
         receiptUrl.endsWith(".jpg") ||
         receiptUrl.endsWith(".jpeg") ||
@@ -85,7 +105,9 @@ export default async function handler(req, res) {
       if (isImage) {
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             chat_id: CHAT_ID,
             photo: receiptUrl,
@@ -95,7 +117,9 @@ export default async function handler(req, res) {
       } else {
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             chat_id: CHAT_ID,
             document: receiptUrl,

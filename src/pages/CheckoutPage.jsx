@@ -178,7 +178,7 @@ export default function CheckoutPage() {
       let orderItems = [];
       let productNameForBot = "";
       let selectedSizeForBot = "";
-      let deliveryTextForBot = orderData.deliveryText || "10-12 kun";
+      let deliveryTextForBot = orderData.deliveryText || "10–15 kun";
 
       if (orderData.productId === "cart") {
         orderTotal = typeof getTotal === "function" ? getTotal() : 0;
@@ -245,34 +245,35 @@ export default function CheckoutPage() {
 
       if (itemsError) throw itemsError;
 
-      if (paymentMethod === "card_transfer") {
-        const response = await fetch("/api/send-order", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fullName,
-            phone,
-            address,
-            productName: productNameForBot,
-            productPrice: orderTotal,
-            selectedSize: selectedSizeForBot,
-            deliveryText: deliveryTextForBot,
-            receiptUrl,
-            mapUrl: mapData?.mapUrl || "",
-          }),
-        });
+      // MUHIM: endi HAR IKKALA to'lov turida ham botga xabar boradi
+      const response = await fetch("/api/send-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName,
+          phone,
+          address,
+          productName: productNameForBot,
+          productPrice: orderTotal,
+          selectedSize: selectedSizeForBot,
+          deliveryText: deliveryTextForBot,
+          receiptUrl: paymentMethod === "cash" ? null : receiptUrl,
+          mapUrl: mapData?.mapUrl || "",
+          paymentMethod,
+          paymentStatus,
+        }),
+      });
 
-        const result = await parseApiResponse(response);
+      const result = await parseApiResponse(response);
 
-        if (!response.ok || !result.success) {
-          throw new Error(
-            typeof result.error === "string"
-              ? result.error
-              : result.message || "Botga yuborilmadi"
-          );
-        }
+      if (!response.ok || !result.success) {
+        throw new Error(
+          typeof result.error === "string"
+            ? result.error
+            : result.message || "Botga yuborilmadi"
+        );
       }
 
       if (orderData.productId === "cart") {
@@ -501,8 +502,7 @@ export default function CheckoutPage() {
           </div>
         ) : (
           <div className="card card-dark p-4 text-sm text-gray-300">
-            ⚠️ Diqqat: Naqd to‘lov tanlangan bo‘lsa ham, buyurtma tasdiqlanishi
-            uchun oldindan to‘lov amalga oshirilishi kerak.
+            ⚠️ Diqqat: Naqd to‘lov tanlanganda ham buyurtma botga yuboriladi va admin ko‘radi.
           </div>
         )}
 

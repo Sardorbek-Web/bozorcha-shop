@@ -40,7 +40,7 @@ export default function CheckoutPage() {
       setPhone(profile.phone || "+998");
       setFullName(
         profile.full_name ||
-        `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
+          `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
       );
     }
   }, [profile]);
@@ -113,44 +113,46 @@ export default function CheckoutPage() {
     }
   }
 
+  async function uploadReceiptIfNeeded() {
+    if (paymentMethod === "cash") return null;
+    if (!receipt) return null;
+
+    const ext = receipt.name.split(".").pop();
+    const fileName = `receipt-${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("payment-receipts")
+      .upload(fileName, receipt);
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from("payment-receipts")
+      .getPublicUrl(fileName);
+
+    return data?.publicUrl || null;
+  }
+
   async function handleSubmit() {
     setMessage("");
 
     if (!fullName.trim()) return setMessage("Ism kiriting");
-    if (!phone.trim() || phone.length < 13) {
-      return setMessage("Telefon noto‘g‘ri");
-    }
+    if (!phone.trim() || phone.length < 13) return setMessage("Telefon noto‘g‘ri");
     if (!address.trim()) return setMessage("Manzil kiriting");
     if (!orderData.productId) return setMessage("Mahsulot topilmadi");
-    if (orderData.productId === "cart" && items.length === 0) {
-      return setMessage("Savatcha bo‘sh");
-    }
 
     if (paymentMethod === "card_transfer" && !receipt) {
       return setMessage("Karta to‘lovi uchun chek yuklang");
     }
 
+    if (orderData.productId === "cart" && (!items || items.length === 0)) {
+      return setMessage("Savatcha bo‘sh");
+    }
+
     setSubmitting(true);
 
     try {
-      let receiptUrl = null;
-
-      if (paymentMethod === "card_transfer" && receipt) {
-        const ext = receipt.name.split(".").pop();
-        const fileName = `receipt-${Date.now()}.${ext}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("payment-receipts")
-          .upload(fileName, receipt);
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("payment-receipts")
-          .getPublicUrl(fileName);
-
-        receiptUrl = urlData.publicUrl;
-      }
+      const receiptUrl = await uploadReceiptIfNeeded();
 
       const { data: addressData, error: addressError } = await supabase
         .from("addresses")
@@ -180,15 +182,18 @@ export default function CheckoutPage() {
 
       if (orderData.productId === "cart") {
         orderTotal = typeof getTotal === "function" ? getTotal() : 0;
+
         orderItems = (items || []).map((item) => ({
           product_id: item.id,
           variant_value: item.selectedSize || null,
           quantity: item.quantity,
           price: item.price,
         }));
+
         productNameForBot = `Savatcha (${items.length} ta mahsulot)`;
       } else {
         orderTotal = Number(orderData.productPrice || 0);
+
         orderItems = [
           {
             product_id: orderData.productId,
@@ -197,9 +202,13 @@ export default function CheckoutPage() {
             price: Number(orderData.productPrice || 0),
           },
         ];
+
         productNameForBot = orderData.productName || "Mahsulot";
         selectedSizeForBot = orderData.selectedSize || "";
       }
+
+      const paymentStatus =
+        paymentMethod === "cash" ? "pending" : "pending_review";
 
       const { data: orderInsert, error: orderError } = await supabase
         .from("orders")
@@ -208,12 +217,9 @@ export default function CheckoutPage() {
             address_id: addressData.id,
             total_amount: orderTotal,
             status: "new",
-            payment_status:
-              paymentMethod === "cash_on_delivery"
-                ? "cash_pending"
-                : "pending_review",
+            payment_status: paymentStatus,
             payment_method: paymentMethod,
-            receipt_url: receiptUrl,
+            receipt_url: paymentMethod === "cash" ? null : receiptUrl,
             notes:
               orderData.productId === "cart"
                 ? `Savatcha buyurtmasi (${orderItems.length} ta mahsulot)`
@@ -239,33 +245,34 @@ export default function CheckoutPage() {
 
       if (itemsError) throw itemsError;
 
-      const response = await fetch("/api/send-order", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName,
-          phone,
-          address,
-          productName: productNameForBot,
-          productPrice: orderTotal,
-          selectedSize: selectedSizeForBot,
-          deliveryText: deliveryTextForBot,
-          receiptUrl: receiptUrl || "",
-          mapUrl: mapData?.mapUrl || "",
-          paymentMethod,
-        }),
-      });
+      if (paymentMethod === "card_transfer") {
+        const response = await fetch("/api/send-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fullName,
+            phone,
+            address,
+            productName: productNameForBot,
+            productPrice: orderTotal,
+            selectedSize: selectedSizeForBot,
+            deliveryText: deliveryTextForBot,
+            receiptUrl,
+            mapUrl: mapData?.mapUrl || "",
+          }),
+        });
 
-      const result = await parseApiResponse(response);
+        const result = await parseApiResponse(response);
 
-      if (!response.ok || !result.success) {
-        throw new Error(
-          typeof result.error === "string"
-            ? result.error
-            : result.message || "Botga yuborilmadi"
-        );
+        if (!response.ok || !result.success) {
+          throw new Error(
+            typeof result.error === "string"
+              ? result.error
+              : result.message || "Botga yuborilmadi"
+          );
+        }
       }
 
       if (orderData.productId === "cart") {
@@ -276,7 +283,6 @@ export default function CheckoutPage() {
       setReceipt(null);
       setAddress("");
       setMapData(null);
-      setPaymentMethod("card_transfer");
     } catch (error) {
       console.error(error);
       setMessage(`Xatolik: ${error.message}`);
@@ -374,6 +380,7 @@ export default function CheckoutPage() {
           <button
             onClick={handleDetectLocation}
             className="btn-secondary w-full"
+            type="button"
           >
             <span className="inline-flex items-center gap-2">
               <Navigation size={16} />
@@ -394,44 +401,47 @@ export default function CheckoutPage() {
         </div>
 
         <div className="card card-dark p-4">
-          <div className="mb-4 flex items-center gap-2">
-            <Wallet size={18} className="text-violet-600" />
-            <h2 className="text-lg font-bold">To‘lov usuli</h2>
-          </div>
+          <h2 className="mb-4 text-lg font-bold">To‘lov usuli</h2>
 
-          <div className="grid gap-3">
+          <div className="space-y-3">
             <button
               type="button"
               onClick={() => setPaymentMethod("card_transfer")}
-              className={`rounded-2xl border px-4 py-4 text-left transition ${paymentMethod === "card_transfer"
+              className={`w-full rounded-3xl border p-4 text-left transition ${
+                paymentMethod === "card_transfer"
                   ? "border-violet-600 bg-violet-600 text-white"
-                  : "border-gray-200 bg-gray-50 dark:border-neutral-700 dark:bg-neutral-800"
-                }`}
+                  : "border-gray-200 bg-gray-50 dark:border-neutral-800 dark:bg-neutral-900"
+              }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <CreditCard size={18} />
-                <span className="font-semibold">Karta orqali to‘lov</span>
+                <div>
+                  <p className="font-semibold">Karta orqali to‘lov</p>
+                  <p className="text-sm opacity-80">
+                    To‘lov qilasiz va chek yuklaysiz
+                  </p>
+                </div>
               </div>
-              <p className="mt-1 text-sm opacity-80">
-                To‘lov qilasiz va chek yuklaysiz
-              </p>
             </button>
 
             <button
               type="button"
-              onClick={() => setPaymentMethod("cash_on_delivery")}
-              className={`rounded-2xl border px-4 py-4 text-left transition ${paymentMethod === "cash_on_delivery"
+              onClick={() => setPaymentMethod("cash")}
+              className={`w-full rounded-3xl border p-4 text-left transition ${
+                paymentMethod === "cash"
                   ? "border-violet-600 bg-violet-600 text-white"
-                  : "border-gray-200 bg-gray-50 dark:border-neutral-700 dark:bg-neutral-800"
-                }`}
+                  : "border-gray-200 bg-gray-50 dark:border-neutral-800 dark:bg-neutral-900"
+              }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <Wallet size={18} />
-                <span className="font-semibold">Naqd to‘lov</span>
+                <div>
+                  <p className="font-semibold">Naqd to‘lov</p>
+                  <p className="text-sm opacity-80">
+                    Naqd to‘lov (oldindan)
+                  </p>
+                </div>
               </div>
-              <p className="mt-1 text-sm opacity-80">
-                Naqd to‘lov (oldindan)
-              </p>
             </button>
           </div>
         </div>
@@ -478,7 +488,9 @@ export default function CheckoutPage() {
               <span className="font-medium">
                 {receipt ? receipt.name : "Chek rasmini tanlang"}
               </span>
-              <span className="mt-1 text-sm text-gray-500">JPG, PNG yoki PDF</span>
+              <span className="mt-1 text-sm text-gray-500">
+                JPG, PNG yoki PDF
+              </span>
               <input
                 type="file"
                 accept="image/*,.pdf"
@@ -488,11 +500,9 @@ export default function CheckoutPage() {
             </label>
           </div>
         ) : (
-          <div className="card card-dark p-4">
-            <div className="rounded-2xl bg-gray-50 p-4 text-sm dark:bg-neutral-800/70">
-              ⚠️ Diqqat: Naqd to‘lov tanlangan bo‘lsa ham,
-              buyurtma tasdiqlanishi uchun oldindan to‘lov amalga oshirilishi kerak.
-            </div>
+          <div className="card card-dark p-4 text-sm text-gray-300">
+            ⚠️ Diqqat: Naqd to‘lov tanlangan bo‘lsa ham, buyurtma tasdiqlanishi
+            uchun oldindan to‘lov amalga oshirilishi kerak.
           </div>
         )}
 
@@ -514,6 +524,7 @@ export default function CheckoutPage() {
             onClick={handleSubmit}
             disabled={submitting}
             className="btn-primary mt-5 w-full py-4 text-base font-semibold disabled:opacity-60"
+            type="button"
           >
             {submitting ? "Yuborilmoqda..." : "Buyurtma berish"}
           </button>

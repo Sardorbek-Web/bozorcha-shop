@@ -4,6 +4,16 @@ import { ImagePlus, Loader2, Send } from "lucide-react";
 import MobileLayout from "../components/layout/MobileLayout";
 import { supabase } from "../lib/supabase";
 
+const categories = [
+  "Krossovka",
+  "Kiyim",
+  "Sumka",
+  "Aksessuar",
+  "Kosmetika",
+  "Elektronika",
+  "Boshqa",
+];
+
 export default function AdminAddProductPage() {
   const navigate = useNavigate();
 
@@ -75,7 +85,15 @@ export default function AdminAddProductPage() {
     return publicUrl;
   }
 
-  async function postToChannel({ name, price, oldPrice, description, sizes, image, category }) {
+  async function postToChannel({
+    name,
+    price,
+    oldPrice,
+    description,
+    sizes,
+    image,
+    category,
+  }) {
     const response = await fetch("/api/post-product", {
       method: "POST",
       headers: {
@@ -117,6 +135,7 @@ export default function AdminAddProductPage() {
     setMessage("");
 
     if (!form.name_uz.trim()) return setMessage("Nom kiriting");
+    if (!form.category) return setMessage("Kategoriya tanlang");
     if (!form.price) return setMessage("Narx kiriting");
     if (!form.stock) return setMessage("Stock kiriting");
 
@@ -164,7 +183,9 @@ export default function AdminAddProductPage() {
           setMessage("Mahsulot saqlandi va kanalga yuborildi ✅");
         } catch (channelError) {
           console.error(channelError);
-          setMessage(`Mahsulot saqlandi, lekin kanalga yuborilmadi: ${channelError.message}`);
+          setMessage(
+            `Mahsulot saqlandi, lekin kanalga yuborilmadi: ${channelError.message}`
+          );
         } finally {
           setPosting(false);
         }
@@ -203,13 +224,19 @@ export default function AdminAddProductPage() {
             placeholder="Nom (RU)"
           />
 
-          <input
+          <select
             name="category"
             value={form.category}
             onChange={handleChange}
             className="input"
-            placeholder="Kategoriya"
-          />
+          >
+            <option value="">Kategoriya tanlang</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
 
           <div className="grid grid-cols-2 gap-3">
             <input
@@ -297,11 +324,7 @@ export default function AdminAddProductPage() {
           </label>
         </div>
 
-        {message ? (
-          <div className="card card-dark p-4 text-sm">
-            {message}
-          </div>
-        ) : null}
+        {message ? <div className="card card-dark p-4 text-sm">{message}</div> : null}
 
         <button
           type="submit"

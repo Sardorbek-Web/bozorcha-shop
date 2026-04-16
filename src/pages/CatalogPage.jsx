@@ -166,9 +166,7 @@ export default function CatalogPage() {
         {loading ? (
           <div className="card card-dark p-6">Yuklanmoqda...</div>
         ) : uiProducts.length === 0 ? (
-          <div className="card card-dark p-6">
-            Mahsulot topilmadi
-          </div>
+          <div className="card card-dark p-6">Mahsulot topilmadi</div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {uiProducts.map((product) => (

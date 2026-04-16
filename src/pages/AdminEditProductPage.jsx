@@ -199,7 +199,7 @@ export default function AdminEditProductPage() {
         .update({
           name_uz: form.name_uz,
           name_ru: form.name_ru || form.name_uz,
-          category: form.category || null,
+          category: form.category,
           price: Number(form.price || 0),
           old_price: form.old_price ? Number(form.old_price) : null,
           stock: Number(form.stock || 0),
@@ -379,9 +379,7 @@ export default function AdminEditProductPage() {
           </label>
         </div>
 
-        {message ? (
-          <div className="card card-dark p-4 text-sm">{message}</div>
-        ) : null}
+        {message ? <div className="card card-dark p-4 text-sm">{message}</div> : null}
 
         <button
           type="submit"
